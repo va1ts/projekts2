@@ -151,3 +151,4 @@ if __name__ == '__main__':
 
 #GPIO.cleanup()
 # End of app.py
+# Path: templates/login.html
