@@ -1,18 +1,36 @@
-<form method="POST">
-    <label for="room">Select Room:</label>
-    <select name="room">
+{% extends 'layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+  <h1>Dashboard</h1>
+  <h2>Assign Fan</h2>
+  <form method="post">
+    <div class="form-group">
+      <label for="room">Room</label>
+      <select class="form-control" id="room" name="room">
         {% for room in rooms %}
-            <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
+        <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
         {% endfor %}
-    </select>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary" name="fan_control" value="assign">Assign Fan</button>
+  </form>
 
-    <button type="submit" name="action" value="assign_fan">Assign Fan</button>
-
+  <h2>Fan Status</h2>
+  <ul class="list-group mt-3">
     {% for fan in fan_assignments %}
-        <div>
-            <h3>Fan in room: {{ fan['room'] }}</h3>
-            <p>Status: {{ fan['status'] }}</p>
-            <button type="submit" name="action" value="toggle_fan">Toggle Fan</button>
-        </div>
+    <li class="list-group-item">
+      Room: {{ fan['room'] }} | Status: {{ fan['status'] }}
+      <form method="post" class="d-inline">
+        <input type="hidden" name="room" value="{{ fan['room'] }}">
+        {% if fan['status'] == 'ON' %}
+        <button type="submit" class="btn btn-danger" name="fan_control" value="off">Turn Off</button>
+        {% else %}
+        <button type="submit" class="btn btn-success" name="fan_control" value="on">Turn On</button>
+        {% endif %}
+      </form>
+    </li>
     {% endfor %}
-</form>
+  </ul>
+{% endblock %}
