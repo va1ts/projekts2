@@ -1,23 +1,28 @@
 import json
 import requests
+import logging
+import atexit
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from gpiozero import OutputDevice, GPIOZeroError
-import atexit
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
+# Logging configuration
+logging.basicConfig(level=logging.DEBUG)
+
 # GPIO Setup
 fan_pin = 18
+fan = None
 
 # Initialize the OutputDevice for the fan with error handling
 try:
     fan = OutputDevice(fan_pin, active_high=False)  # Set active_high to False to invert logic
+    logging.info("Fan initialized successfully.")
 except GPIOZeroError as e:
-    print(f"Error initializing fan: {e}")
-    fan = None
+    logging.error(f"Error initializing fan: {e}")
 
 # Ensure cleanup on exit
 if fan:
@@ -46,33 +51,33 @@ def fetch_room_data(building_id="512"):
     # Make a POST request with the payload and headers
     response = requests.post(url, json=payload, headers=headers)
 
-    print(f"Response Status Code: {response.status_code}")  # Print status code
+    logging.info(f"Response Status Code: {response.status_code}")  # Log status code
 
     # Check if the request was successful and attempt to parse JSON
     if response.status_code == 200:
         try:
             return response.json()  # Try to parse as JSON
         except ValueError as e:
-            print(f"JSON decoding error: {e}")
+            logging.error(f"JSON decoding error: {e}")
             return []  # Return empty list if JSON parsing fails
     else:
-        print(f"Request failed with status code {response.status_code}")
+        logging.error(f"Request failed with status code {response.status_code}")
         return []  # Return empty list if the request failed
 
 # Function to handle fan activation
 def activate_fan():
     if fan:
         fan.on()
-        print("Fan activated.")
+        logging.info("Fan activated.")
     else:
-        print("Fan initialization failed.")
+        logging.warning("Fan initialization failed. Cannot activate fan.")
 
 def deactivate_fan():
     if fan:
         fan.off()
-        print("Fan deactivated.")
+        logging.info("Fan deactivated.")
     else:
-        print("Fan initialization failed.")
+        logging.warning("Fan initialization failed. Cannot deactivate fan.")
 
 # Registration route
 @app.route('/register', methods=['GET', 'POST'])
