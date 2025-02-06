@@ -1,74 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        table, th, td {
-            border: 1px solid black;
-        }
-        th, td {
-            padding: 8px;
-            text-align: center;
-        }
-        .on {
-            background-color: green;
-            color: white;
-        }
-        .off {
-            background-color: red;
-            color: white;
-        }
-    </style>
 </head>
 <body>
-    <h1>Dashboard</h1>
-
-    <!-- Show message if there is one -->
-    {% if message %}
-        <p style="color: red;">{{ message }}</p>
-    {% endif %}
-
-    <!-- Form to add a fan -->
-    <h2>Assign Fan to Room</h2>
-    <form method="POST">
-        <label for="room">Select Room:</label>
-        <select name="room" id="room">
+    <h2>Dashboard</h2>
+    <form method="post">
+        <label for="room">Select Room:</label><br>
+        <select id="room" name="room">
             {% for room in rooms %}
-                <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
+            <option value="{{ room.roomGroupName }}">{{ room.roomGroupName }}</option>
             {% endfor %}
-        </select>
-        <button type="submit">Assign Fan</button>
+        </select><br><br>
+        <input type="submit" value="Add Fan to Room">
     </form>
 
-    <br>
+    <h3>Fan Assignments</h3>
+    <ul>
+        {% for fan in fan_assignments %}
+        <li>{{ fan.room }} - Fan is {{ fan.status }}</li>
+        {% endfor %}
+    </ul>
 
-    <!-- Display assigned fans in a table -->
-    <h2>Assigned Fans</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Fan #</th>
-                <th>Room</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for fan in fan_assignments %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ fan['room'] }}</td>
-                    <td class="{{ 'on' if fan['status'] == 'ON' else 'off' }}">
-                        {{ fan['status'] }}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <form method="post">
+        <input type="submit" name="fan_control" value="on"> Turn Fan On
+        <input type="submit" name="fan_control" value="off"> Turn Fan Off
+    </form>
 </body>
 </html>
