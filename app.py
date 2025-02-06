@@ -2,11 +2,10 @@ import json
 import requests
 import logging
 import atexit
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from gpiozero import OutputDevice, GPIOZeroError, Device
 from gpiozero.pins.rpigpio import RPiGPIOFactory
-import subprocess
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -101,6 +100,7 @@ def register():
         
         # Store the user in the in-memory database
         users[username] = hashed_password
+        flash("Registration successful. Please log in.", "success")
         return redirect(url_for('login'))
     return render_template('register.html')
 
@@ -114,15 +114,17 @@ def login():
         # Check if user exists and password matches
         if username in users and check_password_hash(users[username], password):
             session['user'] = username  # Store the username in the session
+            flash("Login successful.", "success")
             return redirect(url_for('dashboard'))
         else:
-            return "Invalid credentials, please try again."
+            flash("Invalid credentials, please try again.", "danger")
     return render_template('login.html')
 
 # Dashboard route (to show room data and control the fan)
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'user' not in session:
+        flash("Please log in to access the dashboard.", "warning")
         return redirect(url_for('login'))
     
     room_data = fetch_room_data()
@@ -139,32 +141,26 @@ def dashboard():
             
             # Check if the room already has a fan assigned
             if any(fan['room'] == room_name for fan in fan_assignments):
-                message = "Fan is already assigned to this room."
-                return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=message)
+                flash("Fan is already assigned to this room.", "warning")
+                return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
 
             # Add fan with default OFF status
             fan_assignments.append({'room': room_name, 'status': 'OFF'})
+            flash("Fan assigned successfully.", "success")
 
-            # Recheck CO2 levels and update fan status immediately after adding the fan
-            for fan in fan_assignments:
-                for room in room_data:
-                    if room["roomGroupName"] == fan['room']:
-                        # CO2 level check to update fan status
-                        if room.get("co2", 0) > 1000:
-                            fan['status'] = 'ON'
-                        else:
-                            fan['status'] = 'OFF'
-            
         elif 'fan_control' in request.form:
             action = request.form['fan_control']
-            if action == 'on':
-                activate_fan()
-                for fan in fan_assignments:
-                    fan['status'] = 'ON'
-            elif action == 'off':
-                deactivate_fan()
-                for fan in fan_assignments:
-                    fan['status'] = 'OFF'
+            room_name = request.form['room']
+            for fan in fan_assignments:
+                if fan['room'] == room_name:
+                    if action == 'on':
+                        activate_fan()
+                        fan['status'] = 'ON'
+                    elif action == 'off':
+                        deactivate_fan()
+                        fan['status'] = 'OFF'
+                    flash(f"Fan for room {room_name} is now {fan['status']}.", "success")
+                    break
 
         return redirect(url_for('dashboard'))
 
@@ -178,11 +174,10 @@ def dashboard():
                 else:
                     fan['status'] = 'OFF'
 
-    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=None)
+    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
 
 # Run the Flask app
 if __name__ == '__main__':
     users['admin'] = generate_password_hash('123', method='sha256')
     app.run(debug=True, host='0.0.0.0', port=5001)
-
 GPIO.cleanup()
