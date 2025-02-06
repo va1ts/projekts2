@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.security import generate_password_hash, check_password_hash
 from gpiozero import OutputDevice, GPIOZeroError, Device
 from gpiozero.pins.rpigpio import RPiGPIOFactory
+import RPi.GPIO as GPIO
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -26,6 +27,7 @@ def cleanup_gpio():
     if fan:
         fan.close()
         logging.info("GPIO cleanup completed.")
+    GPIO.cleanup()
 
 # Ensure cleanup on exit
 atexit.register(cleanup_gpio)
@@ -120,6 +122,13 @@ def login():
             flash("Invalid credentials, please try again.", "danger")
     return render_template('login.html')
 
+# Logout route
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    flash("You have been logged out.", "success")
+    return redirect(url_for('login'))
+
 # Dashboard route (to show room data and control the fan)
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
@@ -180,4 +189,3 @@ def dashboard():
 if __name__ == '__main__':
     users['admin'] = generate_password_hash('123', method='sha256')
     app.run(debug=True, host='0.0.0.0', port=5001)
-GPIO.cleanup()
