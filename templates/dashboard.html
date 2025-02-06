@@ -1,30 +1,18 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-</head>
-<body>
-    <h2>Dashboard</h2>
-    <form method="post">
-        <label for="room">Select Room:</label><br>
-        <select id="room" name="room">
-            {% for room in rooms %}
-            <option value="{{ room.roomGroupName }}">{{ room.roomGroupName }}</option>
-            {% endfor %}
-        </select><br><br>
-        <input type="submit" value="Add Fan to Room">
-    </form>
-
-    <h3>Fan Assignments</h3>
-    <ul>
-        {% for fan in fan_assignments %}
-        <li>{{ fan.room }} - Fan is {{ fan.status }}</li>
+<form method="POST">
+    <label for="room">Select Room:</label>
+    <select name="room">
+        {% for room in rooms %}
+            <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
         {% endfor %}
-    </ul>
+    </select>
 
-    <form method="post">
-        <input type="submit" name="fan_control" value="on"> Turn Fan On
-        <input type="submit" name="fan_control" value="off"> Turn Fan Off
-    </form>
-</body>
-</html>
+    <button type="submit" name="action" value="assign_fan">Assign Fan</button>
+
+    {% for fan in fan_assignments %}
+        <div>
+            <h3>Fan in room: {{ fan['room'] }}</h3>
+            <p>Status: {{ fan['status'] }}</p>
+            <button type="submit" name="action" value="toggle_fan">Toggle Fan</button>
+        </div>
+    {% endfor %}
+</form>

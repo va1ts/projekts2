@@ -3,20 +3,18 @@ import requests
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
+from gpiozero import OutputDevice
+import time
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-@app.route('/')
-def home():
-    return redirect(url_for('login'))  # Redirect to the login page initially
+# Define the GPIO pin for the fan
+FAN_PIN = 18
 
-
-# GPIO Setup (assuming fan is connected to GPIO pin 17)
-#GPIO.setmode(GPIO.BCM)
-fan_pin = 18
-#GPIO.setup(fan_pin, GPIO.OUT)
+# Initialize the fan pin as an output device with inverted logic
+fan = OutputDevice(FAN_PIN, active_high=False)
 
 # Example user database (in-memory, for simplicity)
 users = {}
@@ -43,7 +41,6 @@ def fetch_room_data(building_id="512"):
 
     print(f"Response Status Code: {response.status_code}")  # Print status code
 
-
     # Check if the request was successful and attempt to parse JSON
     if response.status_code == 200:
         try:
@@ -57,11 +54,11 @@ def fetch_room_data(building_id="512"):
 
 # Function to handle fan activation
 def activate_fan():
-    #GPIO.output(fan_pin, GPIO.HIGH)  # Turn on fan
+    fan.on()
     print("Fan activated.")
 
 def deactivate_fan():
-    #GPIO.output(fan_pin, GPIO.LOW)  # Turn off fan
+    fan.off()
     print("Fan deactivated.")
 
 # Registration route
@@ -108,47 +105,59 @@ def dashboard():
 
     # Add fan functionality
     if request.method == 'POST':
-        room_name = request.form['room']
-        
-        # Check if the room already has a fan assigned
-        if any(fan['room'] == room_name for fan in fan_assignments):
-            message = "Fan is already assigned to this room."
-            return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
+        action = request.form.get('action')
+        room_name = request.form.get('room')
 
-        # Add fan with default OFF status
-        fan_assignments.append({'room': room_name, 'status': 'OFF'})
+        if action == 'assign_fan':
+            # Check if the room already has a fan assigned
+            if any(fan['room'] == room_name for fan in fan_assignments):
+                message = "Fan is already assigned to this room."
+                return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
+
+            # Add fan with default OFF status
+            fan_assignments.append({'room': room_name, 'status': 'OFF'})
+            message = "Fan assigned successfully."
+
+        elif action == 'toggle_fan':
+            # Find the fan in the assignments list and toggle the state
+            for fan_assignment in fan_assignments:
+                if fan_assignment['room'] == room_name:
+                    if fan_assignment['status'] == 'ON':
+                        deactivate_fan()  # Turn off the fan
+                        fan_assignment['status'] = 'OFF'
+                    else:
+                        activate_fan()  # Turn on the fan
+                        fan_assignment['status'] = 'ON'
+
+            message = f"Fan for room {room_name} is now {fan_assignment['status']}."
 
         # Recheck CO2 levels and update fan status immediately after adding the fan
-        for fan in fan_assignments:
+        for fan_assignment in fan_assignments:
             for room in room_data:
-                if room["roomGroupName"] == fan['room']:
+                if room["roomGroupName"] == fan_assignment['room']:
                     # CO2 level check to update fan status
                     if room.get("co2", 0) > 1000:
-                        fan['status'] = 'ON'
+                        fan_assignment['status'] = 'ON'
                     else:
-                        fan['status'] = 'OFF'
+                        fan_assignment['status'] = 'OFF'
 
-        return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments)
+        return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
 
     # Check CO2 levels and update fan statuses based on the latest CO2 data
-    for fan in fan_assignments:
+    for fan_assignment in fan_assignments:
         for room in room_data:
-            if room["roomGroupName"] == fan['room']:
+            if room["roomGroupName"] == fan_assignment['room']:
                 # CO2 level check to update fan status
                 if room.get("co2", 0) > 1000:
-                    fan['status'] = 'ON'
+                    fan_assignment['status'] = 'ON'
                 else:
-                    fan['status'] = 'OFF'
+                    fan_assignment['status'] = 'OFF'
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=None)
-
-
 
 # Run the Flask app
 if __name__ == '__main__':
     users['admin'] = generate_password_hash('123', method='sha256')
     app.run(debug=True, host='0.0.0.0', port=5001)
 
-#GPIO.cleanup()
-# End of app.py
-# Path: templates/login.html
+# GPIO.cleanup()
