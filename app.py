@@ -3,6 +3,7 @@ import requests
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from gpiozero import OutputDevice
+import atexit
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -11,6 +12,9 @@ app.secret_key = 'your_secret_key'
 # GPIO Setup
 fan_pin = 18
 fan = OutputDevice(fan_pin, active_high=False)  # Set active_high to False to invert logic
+
+# Ensure cleanup on exit
+atexit.register(fan.close)
 
 # Example user database (in-memory, for simplicity)
 users = {}
