@@ -1,25 +1,49 @@
 import json
 import requests
-import RPi.GPIO as GPIO
+import logging
+import atexit
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from gpiozero import OutputDevice
-import time
+from gpiozero import OutputDevice, GPIOZeroError, Device
+from gpiozero.pins.rpigpio import RPiGPIOFactory
+import subprocess
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-# Define the GPIO pin for the fan
-FAN_PIN = 18
+# Logging configuration
+logging.basicConfig(level=logging.DEBUG)
 
-# Initialize the fan pin as an output device with inverted logic
-fan = OutputDevice(FAN_PIN, active_high=False)
+# Set the default pin factory to RPiGPIOFactory to avoid conflicts
+Device.pin_factory = RPiGPIOFactory()
+
+# GPIO Setup
+FAN_PIN = 18
+fan = None
+
+# Function to handle GPIO cleanup
+def cleanup_gpio():
+    if fan:
+        fan.close()
+        logging.info("GPIO cleanup completed.")
+
+# Ensure cleanup on exit
+atexit.register(cleanup_gpio)
+
+# Initialize the OutputDevice for the fan with error handling
+try:
+    fan = OutputDevice(FAN_PIN, active_high=False)  # Set active_high to False to invert logic
+    logging.info("Fan initialized successfully.")
+except GPIOZeroError as e:
+    logging.error(f"Error initializing fan: {e}")
+except Exception as e:
+    logging.error(f"Unexpected error: {e}")
 
 # Example user database (in-memory, for simplicity)
 users = {}
 
-# Change fan_assignments to be a list instead of a dictionary
+# Fan assignments
 fan_assignments = []
 
 # This function fetches room data from the given API endpoint
@@ -39,27 +63,33 @@ def fetch_room_data(building_id="512"):
     # Make a POST request with the payload and headers
     response = requests.post(url, json=payload, headers=headers)
 
-    print(f"Response Status Code: {response.status_code}")  # Print status code
+    logging.info(f"Response Status Code: {response.status_code}")  # Log status code
 
     # Check if the request was successful and attempt to parse JSON
     if response.status_code == 200:
         try:
             return response.json()  # Try to parse as JSON
         except ValueError as e:
-            print(f"JSON decoding error: {e}")
+            logging.error(f"JSON decoding error: {e}")
             return []  # Return empty list if JSON parsing fails
     else:
-        print(f"Request failed with status code {response.status_code}")
+        logging.error(f"Request failed with status code {response.status_code}")
         return []  # Return empty list if the request failed
 
 # Function to handle fan activation
 def activate_fan():
-    fan.on()
-    print("Fan activated.")
+    if fan:
+        fan.on()
+        logging.info("Fan activated.")
+    else:
+        logging.warning("Fan initialization failed. Cannot activate fan.")
 
 def deactivate_fan():
-    fan.off()
-    print("Fan deactivated.")
+    if fan:
+        fan.off()
+        logging.info("Fan deactivated.")
+    else:
+        logging.warning("Fan initialization failed. Cannot deactivate fan.")
 
 # Registration route
 @app.route('/register', methods=['GET', 'POST'])
@@ -103,55 +133,50 @@ def dashboard():
     # Remove rooms that already have a fan assigned
     available_rooms = [room for room in room_data if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)]
 
-    # Add fan functionality
     if request.method == 'POST':
-        action = request.form.get('action')
-        room_name = request.form.get('room')
-
-        if action == 'assign_fan':
+        if 'room' in request.form:
+            room_name = request.form['room']
+            
             # Check if the room already has a fan assigned
             if any(fan['room'] == room_name for fan in fan_assignments):
                 message = "Fan is already assigned to this room."
-                return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
+                return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=message)
 
             # Add fan with default OFF status
             fan_assignments.append({'room': room_name, 'status': 'OFF'})
-            message = "Fan assigned successfully."
 
-        elif action == 'toggle_fan':
-            # Find the fan in the assignments list and toggle the state
-            for fan_assignment in fan_assignments:
-                if fan_assignment['room'] == room_name:
-                    if fan_assignment['status'] == 'ON':
-                        deactivate_fan()  # Turn off the fan
-                        fan_assignment['status'] = 'OFF'
-                    else:
-                        activate_fan()  # Turn on the fan
-                        fan_assignment['status'] = 'ON'
+            # Recheck CO2 levels and update fan status immediately after adding the fan
+            for fan in fan_assignments:
+                for room in room_data:
+                    if room["roomGroupName"] == fan['room']:
+                        # CO2 level check to update fan status
+                        if room.get("co2", 0) > 1000:
+                            fan['status'] = 'ON'
+                        else:
+                            fan['status'] = 'OFF'
+            
+        elif 'fan_control' in request.form:
+            action = request.form['fan_control']
+            if action == 'on':
+                activate_fan()
+                for fan in fan_assignments:
+                    fan['status'] = 'ON'
+            elif action == 'off':
+                deactivate_fan()
+                for fan in fan_assignments:
+                    fan['status'] = 'OFF'
 
-            message = f"Fan for room {room_name} is now {fan_assignment['status']}."
-
-        # Recheck CO2 levels and update fan status immediately after adding the fan
-        for fan_assignment in fan_assignments:
-            for room in room_data:
-                if room["roomGroupName"] == fan_assignment['room']:
-                    # CO2 level check to update fan status
-                    if room.get("co2", 0) > 1000:
-                        fan_assignment['status'] = 'ON'
-                    else:
-                        fan_assignment['status'] = 'OFF'
-
-        return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
+        return redirect(url_for('dashboard'))
 
     # Check CO2 levels and update fan statuses based on the latest CO2 data
-    for fan_assignment in fan_assignments:
+    for fan in fan_assignments:
         for room in room_data:
-            if room["roomGroupName"] == fan_assignment['room']:
+            if room["roomGroupName"] == fan['room']:
                 # CO2 level check to update fan status
                 if room.get("co2", 0) > 1000:
-                    fan_assignment['status'] = 'ON'
+                    fan['status'] = 'ON'
                 else:
-                    fan_assignment['status'] = 'OFF'
+                    fan['status'] = 'OFF'
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=None)
 
@@ -159,5 +184,3 @@ def dashboard():
 if __name__ == '__main__':
     users['admin'] = generate_password_hash('123', method='sha256')
     app.run(debug=True, host='0.0.0.0', port=5001)
-
-# GPIO.cleanup()
