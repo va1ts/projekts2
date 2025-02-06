@@ -151,11 +151,10 @@ def dashboard():
             # Check if the room already has a fan assigned
             if any(fan['room'] == room_name for fan in fan_assignments):
                 flash("Fan is already assigned to this room.", "warning")
-                return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
-
-            # Add fan with default OFF status
-            fan_assignments.append({'room': room_name, 'status': 'OFF'})
-            flash("Fan assigned successfully.", "success")
+            else:
+                # Add fan with default OFF status
+                fan_assignments.append({'room': room_name, 'status': 'OFF'})
+                flash("Fan assigned successfully.", "success")
 
         elif 'fan_control' in request.form:
             action = request.form['fan_control']
