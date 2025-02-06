@@ -1,41 +1,27 @@
 import json
 import requests
-import logging
-import atexit
+import RPi.GPIO as GPIO
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from gpiozero import OutputDevice, GPIOZeroError, Device
-from gpiozero.pins.native import NativeFactory
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
-# Logging configuration
-logging.basicConfig(level=logging.DEBUG)
+@app.route('/')
+def home():
+    return redirect(url_for('login'))  # Redirect to the login page initially
 
-# Set the default pin factory to NativeFactory to avoid conflicts
-Device.pin_factory = NativeFactory()
 
-# GPIO Setup
+# GPIO Setup (assuming fan is connected to GPIO pin 17)
+#GPIO.setmode(GPIO.BCM)
 fan_pin = 18
-fan = None
-
-# Initialize the OutputDevice for the fan with error handling
-try:
-    fan = OutputDevice(fan_pin, active_high=False)  # Set active_high to False to invert logic
-    logging.info("Fan initialized successfully.")
-except GPIOZeroError as e:
-    logging.error(f"Error initializing fan: {e}")
-
-# Ensure cleanup on exit
-if fan:
-    atexit.register(fan.close)
+#GPIO.setup(fan_pin, GPIO.OUT)
 
 # Example user database (in-memory, for simplicity)
 users = {}
 
-# Fan assignments
+# Change fan_assignments to be a list instead of a dictionary
 fan_assignments = []
 
 # This function fetches room data from the given API endpoint
@@ -55,33 +41,28 @@ def fetch_room_data(building_id="512"):
     # Make a POST request with the payload and headers
     response = requests.post(url, json=payload, headers=headers)
 
-    logging.info(f"Response Status Code: {response.status_code}")  # Log status code
+    print(f"Response Status Code: {response.status_code}")  # Print status code
+
 
     # Check if the request was successful and attempt to parse JSON
     if response.status_code == 200:
         try:
             return response.json()  # Try to parse as JSON
         except ValueError as e:
-            logging.error(f"JSON decoding error: {e}")
+            print(f"JSON decoding error: {e}")
             return []  # Return empty list if JSON parsing fails
     else:
-        logging.error(f"Request failed with status code {response.status_code}")
+        print(f"Request failed with status code {response.status_code}")
         return []  # Return empty list if the request failed
 
 # Function to handle fan activation
 def activate_fan():
-    if fan:
-        fan.on()
-        logging.info("Fan activated.")
-    else:
-        logging.warning("Fan initialization failed. Cannot activate fan.")
+    #GPIO.output(fan_pin, GPIO.HIGH)  # Turn on fan
+    print("Fan activated.")
 
 def deactivate_fan():
-    if fan:
-        fan.off()
-        logging.info("Fan deactivated.")
-    else:
-        logging.warning("Fan initialization failed. Cannot deactivate fan.")
+    #GPIO.output(fan_pin, GPIO.LOW)  # Turn off fan
+    print("Fan deactivated.")
 
 # Registration route
 @app.route('/register', methods=['GET', 'POST'])
@@ -125,40 +106,29 @@ def dashboard():
     # Remove rooms that already have a fan assigned
     available_rooms = [room for room in room_data if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)]
 
+    # Add fan functionality
     if request.method == 'POST':
-        if 'room' in request.form:
-            room_name = request.form['room']
-            
-            # Check if the room already has a fan assigned
-            if any(fan['room'] == room_name for fan in fan_assignments):
-                message = "Fan is already assigned to this room."
-                return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=message)
+        room_name = request.form['room']
+        
+        # Check if the room already has a fan assigned
+        if any(fan['room'] == room_name for fan in fan_assignments):
+            message = "Fan is already assigned to this room."
+            return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments, message=message)
 
-            # Add fan with default OFF status
-            fan_assignments.append({'room': room_name, 'status': 'OFF'})
+        # Add fan with default OFF status
+        fan_assignments.append({'room': room_name, 'status': 'OFF'})
 
-            # Recheck CO2 levels and update fan status immediately after adding the fan
-            for fan in fan_assignments:
-                for room in room_data:
-                    if room["roomGroupName"] == fan['room']:
-                        # CO2 level check to update fan status
-                        if room.get("co2", 0) > 1000:
-                            fan['status'] = 'ON'
-                        else:
-                            fan['status'] = 'OFF'
-            
-        elif 'fan_control' in request.form:
-            action = request.form['fan_control']
-            if action == 'on':
-                activate_fan()
-                for fan in fan_assignments:
-                    fan['status'] = 'ON'
-            elif action == 'off':
-                deactivate_fan()
-                for fan in fan_assignments:
-                    fan['status'] = 'OFF'
+        # Recheck CO2 levels and update fan status immediately after adding the fan
+        for fan in fan_assignments:
+            for room in room_data:
+                if room["roomGroupName"] == fan['room']:
+                    # CO2 level check to update fan status
+                    if room.get("co2", 0) > 1000:
+                        fan['status'] = 'ON'
+                    else:
+                        fan['status'] = 'OFF'
 
-        return redirect(url_for('dashboard'))
+        return render_template('dashboard.html', rooms=room_data, fan_assignments=fan_assignments)
 
     # Check CO2 levels and update fan statuses based on the latest CO2 data
     for fan in fan_assignments:
@@ -172,9 +142,13 @@ def dashboard():
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, message=None)
 
+
+
 # Run the Flask app
 if __name__ == '__main__':
     users['admin'] = generate_password_hash('123', method='sha256')
     app.run(debug=True, host='0.0.0.0', port=5001)
 
+#GPIO.cleanup()
 # End of app.py
+# Path: templates/login.html
