@@ -2,7 +2,7 @@ import json
 import requests
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from gpiozero import OutputDevice
+from gpiozero import OutputDevice, GPIOZeroError
 import atexit
 
 # Initialize Flask app
@@ -11,10 +11,17 @@ app.secret_key = 'your_secret_key'
 
 # GPIO Setup
 fan_pin = 18
-fan = OutputDevice(fan_pin, active_high=False)  # Set active_high to False to invert logic
+
+# Initialize the OutputDevice for the fan with error handling
+try:
+    fan = OutputDevice(fan_pin, active_high=False)  # Set active_high to False to invert logic
+except GPIOZeroError as e:
+    print(f"Error initializing fan: {e}")
+    fan = None
 
 # Ensure cleanup on exit
-atexit.register(fan.close)
+if fan:
+    atexit.register(fan.close)
 
 # Example user database (in-memory, for simplicity)
 users = {}
@@ -54,12 +61,18 @@ def fetch_room_data(building_id="512"):
 
 # Function to handle fan activation
 def activate_fan():
-    fan.on()
-    print("Fan activated.")
+    if fan:
+        fan.on()
+        print("Fan activated.")
+    else:
+        print("Fan initialization failed.")
 
 def deactivate_fan():
-    fan.off()
-    print("Fan deactivated.")
+    if fan:
+        fan.off()
+        print("Fan deactivated.")
+    else:
+        print("Fan initialization failed.")
 
 # Registration route
 @app.route('/register', methods=['GET', 'POST'])
