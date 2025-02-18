@@ -28,7 +28,6 @@
           <p><strong>Room:</strong> {{ fan['room'] }}</p>
           <p><strong>Status:</strong> {{ fan['status'] }}</p>
           <form action="{{ url_for('dashboard') }}" method="post">
-            {{ csrf_token() }}
             <input type="hidden" name="room" value="{{ fan['room'] }}">
             <button type="submit" name="fan_control" value="on" class="btn btn-success">Turn On</button>
             <button type="submit" name="fan_control" value="off" class="btn btn-danger">Turn Off</button>
