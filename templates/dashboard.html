@@ -3,34 +3,38 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block body %}
-  <h1>Dashboard</h1>
-  <h2>Assign Fan</h2>
-  <form method="post">
-    <div class="form-group">
-      <label for="room">Room</label>
-      <select class="form-control" id="room" name="room">
-        {% for room in rooms %}
-        <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="btn btn-primary" name="fan_control" value="assign">Assign Fan</button>
-  </form>
+  <div class="container">
+    <h1>Dashboard</h1>
 
-  <h2>Fan Status</h2>
-  <ul class="list-group mt-3">
-    {% for fan in fan_assignments %}
-    <li class="list-group-item">
-      Room: {{ fan['room'] }} | Status: {{ fan['status'] }}
-      <form method="post" class="d-inline">
-        <input type="hidden" name="room" value="{{ fan['room'] }}">
-        {% if fan['status'] == 'ON' %}
-        <button type="submit" class="btn btn-danger" name="fan_control" value="off">Turn Off</button>
-        {% else %}
-        <button type="submit" class="btn btn-success" name="fan_control" value="on">Turn On</button>
-        {% endif %}
-      </form>
-    </li>
-    {% endfor %}
-  </ul>
+    <!-- Assign Fan Section -->
+    <h2>Assign Fan</h2>
+    <form method="post">
+      <div class="form-group">
+        <label for="room">Room</label>
+        <select class="form-control" id="room" name="room">
+          {% for room in rooms %}
+            <option value="{{ room['roomGroupName'] }}">{{ room['roomGroupName'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" name="assign_fan">Assign Fan</button>
+    </form>
+
+    <!-- Fan Assignments Section -->
+    <h2>Fan Assignments</h2>
+    <ul class="list-group mt-3">
+      {% for fan in fan_assignments %}
+        <li class="list-group-item">
+          <p><strong>Room:</strong> {{ fan['room'] }}</p>
+          <p><strong>Status:</strong> {{ fan['status'] }}</p>
+          <form action="{{ url_for('dashboard') }}" method="post">
+            {{ csrf_token() }}
+            <input type="hidden" name="room" value="{{ fan['room'] }}">
+            <button type="submit" name="fan_control" value="on" class="btn btn-success">Turn On</button>
+            <button type="submit" name="fan_control" value="off" class="btn btn-danger">Turn Off</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
 {% endblock %}

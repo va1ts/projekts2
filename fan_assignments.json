@@ -1,1 +1,7 @@
-[{"room": "15", "status": "OFF"}, {"room": "19", "status": "ON"}, {"room": "108", "status": "ON"}]
+[
+    {
+        "room": "110",
+        "status": "ON",
+        "message": "CO2 level reached threshold. Fan should be ON."
+    }   
+]

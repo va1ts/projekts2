@@ -4,8 +4,7 @@ import logging
 import atexit
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from gpiozero import OutputDevice, GPIOZeroError, Device
-from gpiozero.pins.rpigpio import RPiGPIOFactory
+from gpiozero import OutputDevice, GPIOZeroError
 import RPi.GPIO as GPIO
 
 # Initialize Flask app
@@ -15,31 +14,27 @@ app.secret_key = 'your_secret_key'
 # Logging configuration
 logging.basicConfig(level=logging.DEBUG)
 
-# Set the default pin factory to RPiGPIOFactory to avoid conflicts
-Device.pin_factory = RPiGPIOFactory()
-
-# GPIO Setup
 FAN_PIN = 18
-fan = None
+
+
+# Initialize the OutputDevice for the fan
+try:
+    fan_device = OutputDevice(FAN_PIN, active_high=False)
+    logging.info("Fan OutputDevice initialized successfully.")
+except GPIOZeroError as e:
+    logging.error(f"Failed to initialize fan OutputDevice: {e}")
 
 # Function to handle GPIO cleanup
 def cleanup_gpio():
-    if fan:
-        fan.close()
+    if fan_device:
+        fan_device.close()
         logging.info("GPIO cleanup completed.")
-    GPIO.cleanup()
 
+    
+if fan_device:
+    fan_device.on()
 # Ensure cleanup on exit
 atexit.register(cleanup_gpio)
-
-# Initialize the OutputDevice for the fan with error handling
-try:
-    fan = OutputDevice(FAN_PIN, active_high=False)  # Set active_high to False to invert logic
-    logging.info("Fan initialized successfully.")
-except GPIOZeroError as e:
-    logging.error(f"Error initializing fan: {e}")
-except Exception as e:
-    logging.error(f"Unexpected error: {e}")
 
 # Example user database (in-memory, for simplicity)
 users = {}
@@ -47,7 +42,7 @@ users = {}
 # Fan assignments
 fan_assignments = []
 
-# This function fetches room data from the given API endpoint
+# Fetch room data from the API endpoint
 def fetch_room_data(building_id="512"):
     url = "https://co2.mesh.lv/api/device/list"  # Correct API endpoint
     payload = {
@@ -77,20 +72,22 @@ def fetch_room_data(building_id="512"):
         logging.error(f"Request failed with status code {response.status_code}")
         return []  # Return empty list if the request failed
 
-# Function to handle fan activation
-def activate_fan():
-    if fan:
-        fan.on()
-        logging.info("Fan activated.")
+# Functions to handle fan activation
+def turn_fan_on():
+    if fan_device:
+        fan_device.on()
+        logging.info("Fan is ON")
+        print("Fan is ON")
     else:
-        logging.warning("Fan initialization failed. Cannot activate fan.")
+        logging.warning("Fan device is not initialized. Cannot turn fan ON.")
 
-def deactivate_fan():
-    if fan:
-        fan.off()
-        logging.info("Fan deactivated.")
+def turn_fan_off():
+    if fan_device:
+        fan_device.off()
+        logging.info("Fan is OFF")
+        print("Fan is OFF")
     else:
-        logging.warning("Fan initialization failed. Cannot deactivate fan.")
+        logging.warning("Fan device is not initialized. Cannot turn fan OFF.")
 
 # Registration route
 @app.route('/register', methods=['GET', 'POST'])
@@ -100,7 +97,10 @@ def register():
         password = request.form['password']
         hashed_password = generate_password_hash(password, method='sha256')
         
-        # Store the user in the in-memory database
+        if username in users:
+            flash("Username already exists. Please choose a different one.", "warning")
+            return redirect(url_for('register'))
+
         users[username] = hashed_password
         flash("Registration successful. Please log in.", "success")
         return redirect(url_for('login'))
@@ -113,14 +113,21 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        # Check if user exists and password matches
         if username in users and check_password_hash(users[username], password):
-            session['user'] = username  # Store the username in the session
+            session['user'] = username
             flash("Login successful.", "success")
             return redirect(url_for('dashboard'))
         else:
             flash("Invalid credentials, please try again.", "danger")
     return render_template('login.html')
+
+# Root route
+@app.route('/')
+def home():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    else:
+        return redirect(url_for('login'))
 
 # Logout route
 @app.route('/logout')
@@ -129,7 +136,7 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for('login'))
 
-# Dashboard route (to show room data and control the fan)
+# Dashboard route
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'user' not in session:
@@ -137,46 +144,47 @@ def dashboard():
         return redirect(url_for('login'))
     
     room_data = fetch_room_data()
-
-    # Sort rooms alphabetically by their name
     room_data.sort(key=lambda room: room['roomGroupName'])
 
     # Remove rooms that already have a fan assigned
-    available_rooms = [room for room in room_data if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)]
+    available_rooms = [
+        room for room in room_data
+        if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)
+    ]
 
     if request.method == 'POST':
-        if 'room' in request.form:
+        if 'assign_fan' in request.form:
+            # Assign fan to room
             room_name = request.form['room']
-            
-            # Check if the room already has a fan assigned
             if any(fan['room'] == room_name for fan in fan_assignments):
                 flash("Fan is already assigned to this room.", "warning")
             else:
-                # Add fan with default OFF status
                 fan_assignments.append({'room': room_name, 'status': 'OFF'})
-                flash("Fan assigned successfully.", "success")
-
+                flash(f"Fan assigned to room {room_name}.", "success")
+                logging.info(f"Fan assigned to room {room_name}.")
         elif 'fan_control' in request.form:
+            # Control fan (turn on/off)
             action = request.form['fan_control']
             room_name = request.form['room']
+
             for fan in fan_assignments:
                 if fan['room'] == room_name:
                     if action == 'on':
-                        activate_fan()
+                        turn_fan_on()
                         fan['status'] = 'ON'
                     elif action == 'off':
-                        deactivate_fan()
+                        turn_fan_off()
                         fan['status'] = 'OFF'
                     flash(f"Fan for room {room_name} is now {fan['status']}.", "success")
+                    logging.info(f"Fan for room {room_name} set to {fan['status']}.")
                     break
 
         return redirect(url_for('dashboard'))
 
-    # Check CO2 levels and update fan statuses based on the latest CO2 data
+    # Update fan statuses based on CO2 levels
     for fan in fan_assignments:
         for room in room_data:
             if room["roomGroupName"] == fan['room']:
-                # CO2 level check to update fan status
                 if room.get("co2", 0) > 1000:
                     fan['status'] = 'ON'
                 else:
@@ -186,5 +194,6 @@ def dashboard():
 
 # Run the Flask app
 if __name__ == '__main__':
+    # Initialize admin user
     users['admin'] = generate_password_hash('123', method='sha256')
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5002)
