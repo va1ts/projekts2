@@ -1,6 +1,4 @@
 import json
-import os
-import csv
 import requests
 import logging
 import atexit
@@ -18,7 +16,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 FAN_PIN = 18
 
-CSV_FILE = 'fan_assignments.csv'
 
 # Initialize the OutputDevice for the fan
 try:
@@ -38,20 +35,6 @@ if fan_device:
     fan_device.on()
 # Ensure cleanup on exit
 atexit.register(cleanup_gpio)
-
-def load_fan_assignments():
-    if os.path.exists(CSV_FILE):
-        with open(CSV_FILE, mode='r') as file:
-            reader = csv.DictReader(file)
-            return [row for row in reader]
-    return []
-
-def save_fan_assignments():
-    with open(CSV_FILE, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["room", "status"])
-        writer.writeheader()
-        for fan in fan_assignments:
-            writer.writerow(fan)
 
 # Example user database (in-memory, for simplicity)
 users = {}
@@ -160,9 +143,6 @@ def dashboard():
         flash("Please log in to access the dashboard.", "warning")
         return redirect(url_for('login'))
     
-
-    fan_assignments = load_fan_assignments()
-
     room_data = fetch_room_data()
     room_data.sort(key=lambda room: room['roomGroupName'])
 
@@ -195,7 +175,6 @@ def dashboard():
                     elif action == 'off':
                         turn_fan_off()
                         fan['status'] = 'OFF'
-                    save_fan_assignments()  # Save to CSV
                     flash(f"Fan for room {room_name} is now {fan['status']}.", "success")
                     logging.info(f"Fan for room {room_name} set to {fan['status']}.")
                     break
@@ -210,8 +189,6 @@ def dashboard():
                     fan['status'] = 'ON'
                 else:
                     fan['status'] = 'OFF'
-
-    save_fan_assignments()  # Save updated fan statuses to CSV  
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
 
