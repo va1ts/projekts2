@@ -1,7 +1,0 @@
-[
-    {
-        "room": "110",
-        "status": "ON",
-        "message": "CO2 level reached threshold. Fan should be ON."
-    }   
-]
