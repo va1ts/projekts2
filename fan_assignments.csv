@@ -1,5 +1,5 @@
-Room,   status,     pin
-101,    OFF,    18
-107,    OFF,    23
-108,    OFF,    24
-11,     OFF,    25
+room,status,pin
+101,OFF,18
+107,OFF,23
+108,OFF,24
+11,OFF,25
