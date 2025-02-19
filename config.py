@@ -6,8 +6,6 @@ SECRET_KEY = 'your_secret_key'
 # Logging configuration
 logging.basicConfig(level=logging.DEBUG)
 
-# GPIO Pin for Fan Control
-FAN_PIN = 18
 
 # API Config
 CO2_API_URL = "https://co2.mesh.lv/api/device/list"
