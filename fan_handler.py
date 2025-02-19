@@ -5,23 +5,19 @@ import os
 FAN_ASSIGNMENTS_FILE = "fan_assignments.csv"
 AVAILABLE_FAN_PINS = [18, 23, 24, 25]  # List of GPIO pins for fans
 
-# Load existing fan assignments from CSV
-def load_fan_assignments(file_path='fan_assignments.csv'):
+def load_fan_assignments():
     fan_assignments = []
     try:
-        with open(file_path, 'r') as file:
-            reader = csv.DictReader(file)  # Use DictReader to access columns by name
+        with open("fan_assignments.csv", "r") as file:
+            reader = csv.DictReader(file)
             for row in reader:
-                # Ensure 'pin' exists in the row
-                if 'pin' in row:
-                    fan_assignments.append({"room": row["room"], "status": row["status"], "pin": int(row["pin"])})
-                else:
-                    logging.warning(f"Row skipped due to missing 'pin': {row}")
+                fan_assignments.append({
+                    "room": row["room"],
+                    "status": row["status"],
+                    "pin": int(row["pin"])  # Ensure the pin is treated as an integer
+                })
     except FileNotFoundError:
-        logging.error(f"{file_path} not found.")
-    except Exception as e:
-        logging.error(f"Error loading fan assignments: {e}")
-    
+        logging.warning("fan_assignments.csv not found. No fan assignments loaded.")
     return fan_assignments
 
 # Save fan assignments to CSV
