@@ -1,142 +1,22 @@
-import json
-import requests
 import logging
-import atexit
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from werkzeug.security import generate_password_hash, check_password_hash
-from gpiozero import OutputDevice, GPIOZeroError
-import RPi.GPIO as GPIO
+from flask import Flask, render_template, redirect, url_for, request, flash, session
+from api_handler import fetch_room_data
+from hardware import turn_fan_on, turn_fan_off
+from auth import auth
 
-# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
-
-# Logging configuration
-logging.basicConfig(level=logging.DEBUG)
-
-FAN_PIN = 18
-
-
-# Initialize the OutputDevice for the fan
-try:
-    fan_device = OutputDevice(FAN_PIN, active_high=False)
-    logging.info("Fan OutputDevice initialized successfully.")
-except GPIOZeroError as e:
-    logging.error(f"Failed to initialize fan OutputDevice: {e}")
-
-# Function to handle GPIO cleanup
-def cleanup_gpio():
-    if fan_device:
-        fan_device.close()
-        logging.info("GPIO cleanup completed.")
-
-    
-if fan_device:
-    fan_device.on()
-# Ensure cleanup on exit
-atexit.register(cleanup_gpio)
-
-# Example user database (in-memory, for simplicity)
-users = {}
+app.register_blueprint(auth)
 
 # Fan assignments
 fan_assignments = []
 
-# Fetch room data from the API endpoint
-def fetch_room_data(building_id="512"):
-    url = "https://co2.mesh.lv/api/device/list"  # Correct API endpoint
-    payload = {
-        "buildingId": building_id,
-        "captchaToken": None
-    }
-
-    headers = {
-        'Content-Type': 'application/json',  # Ensure correct content type
-        'Accept': 'application/json',  # Accept JSON response
-        'User-Agent': 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',  # Optional: user-agent to match browser
-    }
-
-    # Make a POST request with the payload and headers
-    response = requests.post(url, json=payload, headers=headers)
-
-    logging.info(f"Response Status Code: {response.status_code}")  # Log status code
-
-    # Check if the request was successful and attempt to parse JSON
-    if response.status_code == 200:
-        try:
-            return response.json()  # Try to parse as JSON
-        except ValueError as e:
-            logging.error(f"JSON decoding error: {e}")
-            return []  # Return empty list if JSON parsing fails
-    else:
-        logging.error(f"Request failed with status code {response.status_code}")
-        return []  # Return empty list if the request failed
-
-# Functions to handle fan activation
-def turn_fan_on():
-    if fan_device:
-        fan_device.on()
-        logging.info("Fan is ON")
-        print("Fan is ON")
-    else:
-        logging.warning("Fan device is not initialized. Cannot turn fan ON.")
-
-def turn_fan_off():
-    if fan_device:
-        fan_device.off()
-        logging.info("Fan is OFF")
-        print("Fan is OFF")
-    else:
-        logging.warning("Fan device is not initialized. Cannot turn fan OFF.")
-
-# Registration route
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        hashed_password = generate_password_hash(password, method='sha256')
-        
-        if username in users:
-            flash("Username already exists. Please choose a different one.", "warning")
-            return redirect(url_for('register'))
-
-        users[username] = hashed_password
-        flash("Registration successful. Please log in.", "success")
-        return redirect(url_for('login'))
-    return render_template('register.html')
-
-# Login route
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        if username in users and check_password_hash(users[username], password):
-            session['user'] = username
-            flash("Login successful.", "success")
-            return redirect(url_for('dashboard'))
-        else:
-            flash("Invalid credentials, please try again.", "danger")
-    return render_template('login.html')
-
-# Root route
 @app.route('/')
 def home():
     if 'user' in session:
         return redirect(url_for('dashboard'))
-    else:
-        return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))
 
-# Logout route
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    flash("You have been logged out.", "success")
-    return redirect(url_for('login'))
-
-# Dashboard route
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'user' not in session:
@@ -192,8 +72,5 @@ def dashboard():
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
 
-# Run the Flask app
 if __name__ == '__main__':
-    # Initialize admin user
-    users['admin'] = generate_password_hash('123', method='sha256')
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5002)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5001)
