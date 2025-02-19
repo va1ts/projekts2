@@ -28,6 +28,9 @@ def dashboard():
         flash("Please log in to access the dashboard.", "warning")
         return redirect(url_for('auth.login'))  # Fixed incorrect redirect
     
+    global fan_assignments
+    fan_assignments = load_fan_assignments()  # Load shared fan data
+    
     room_data = fetch_room_data()
     room_data.sort(key=lambda room: room['roomGroupName'])
 
@@ -76,16 +79,17 @@ def dashboard():
 
         return redirect(url_for('dashboard'))
 
-    # Update fan statuses based on CO2 levels
+    # Update fan statuses based on CO2 levels and custom messages
     for fan in fan_assignments:
         for room in room_data:
             if room["roomGroupName"] == fan['room']:
-                if room.get("co2", 0) > 1000:
-                    turn_fan_on(fan["pin"])
+                co2_level = room.get("co2", 0)
+                if co2_level > 1000:
                     fan['status'] = 'ON'
+                    fan['message'] = "Fan is ON because CO2 level is above 1000ppm."
                 else:
-                    turn_fan_off(fan["pin"])
                     fan['status'] = 'OFF'
+                    fan['message'] = "Fan is not needed as CO2 level is below 1000ppm."
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
 

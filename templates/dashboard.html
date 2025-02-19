@@ -20,13 +20,15 @@
       <button type="submit" class="btn btn-primary" name="assign_fan">Assign Fan</button>
     </form>
 
-    <!-- Fan Assignments Section -->
-    <h2>Fan Assignments</h2>
-    <ul class="list-group mt-3">
-      {% for fan in fan_assignments %}
-        <li class="list-group-item">
-          <p><strong>Room:</strong> {{ fan['room'] }}</p>
-          <p><strong>Status:</strong> {{ fan['status'] }}</p>
+     <!-- Fan Assignments Section -->
+     <h2>Fan Assignments</h2>
+     <ul class="list-group mt-3">
+       {% for fan in fan_assignments %}
+         <li class="list-group-item">
+           <p><strong>Room:</strong> {{ fan['room'] }}</p>
+           <p><strong>Status:</strong> {{ fan['status'] }}</p>
+           <p><strong>Message:</strong> {{ fan['message'] }}</p> <!-- Display the CO2-based message -->
+           
           <form action="{{ url_for('dashboard') }}" method="post">
             <input type="hidden" name="room" value="{{ fan['room'] }}">
             <button type="submit" name="fan_control" value="on" class="btn btn-success">Turn On</button>
