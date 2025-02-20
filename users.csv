@@ -1,2 +1,3 @@
 username,password,role
 loser,sha256$72sLCSNm5Pw1z7c7$06a4236e890637179d52a124c877b87e68e9bb3d88f4361eaac42177c63159fe,user
+admin,sha256$ZyJOVe2179Nz0WJp$c146a6c90346afe63119ef5f16e60d0486d7fb79ed4bdf4e1ad5f0ad161a9830,user
