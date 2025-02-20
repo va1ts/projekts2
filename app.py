@@ -146,7 +146,7 @@ def dashboard():
                     fan['co2_level'] = co2_level
                     fan['message'] = "Fan is not needed as CO2 level is below 1000ppm."
 
-    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)
+    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data = room_data)
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5002)
