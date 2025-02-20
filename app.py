@@ -4,6 +4,8 @@ from api_handler import fetch_room_data
 from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
+from flask import jsonify
+
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -21,6 +23,20 @@ def home():
     if 'user' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('auth.login'))
+
+@app.route('/api/get_co2_levels')
+def get_co2_levels():
+    room_data = fetch_room_data()  # Fetch latest CO2 data
+    co2_levels = []
+
+    for room in room_data:
+        co2_levels.append({
+            "roomGroupName": room["roomGroupName"],
+            "co2": room.get("co2", 0)
+        })
+
+    return jsonify(co2_levels)
+
 
 @app.route('/graph/<room>')
 def room_graph(room):

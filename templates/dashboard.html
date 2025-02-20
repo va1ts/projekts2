@@ -46,7 +46,7 @@
             <a href="{{ url_for('room_graph', room=fan['room']) }}">{{ fan['room'] }}</a>
           </p>
           <p>
-            <strong>CO₂ Level:</strong> 
+            <strong>CO₂ Level:</strong>
             {% if fan['co2_level'] < 1000 %}
               {% set co2_class = 'co2-low' %}
             {% elif fan['co2_level'] < 1500 %}
@@ -56,7 +56,11 @@
             {% else %}
               {% set co2_class = 'co2-critical' %}
             {% endif %}
-            <span class="co2-box {{ co2_class }}">{{ fan['co2_level'] }} ppm</span>
+            
+            <!-- Added an ID to each CO₂ element -->
+            <span id="co2-{{ fan['room'] }}" class="co2-box {{ co2_class }}">
+              {{ fan['co2_level'] }} ppm
+            </span>
           </p>
           {% if fan.get('message') %}
             <p><strong>Message:</strong> {{ fan['message'] }}</p>
@@ -71,4 +75,40 @@
       {% endfor %}
     </ul>
   </div>
+
+  <!-- JavaScript for Dynamic CO₂ Level Updates -->
+  <script>
+    // Function to fetch updated CO2 levels
+    function updateCO2Levels() {
+      fetch("{{ url_for('get_co2_levels') }}") // Calls new API endpoint
+        .then(response => response.json())
+        .then(data => {
+          data.forEach(room => {
+            let co2Element = document.getElementById(`co2-${room.roomGroupName}`);
+            if (co2Element) {
+              co2Element.innerText = room.co2 + " ppm";
+              
+              // Update background color based on CO2 level
+              if (room.co2 < 1000) {
+                co2Element.className = "co2-box co2-low";
+              } else if (room.co2 < 1500) {
+                co2Element.className = "co2-box co2-medium";
+              } else if (room.co2 < 2000) {
+                co2Element.className = "co2-box co2-high";
+              } else {
+                co2Element.className = "co2-box co2-critical";
+              }
+            }
+          });
+        })
+        .catch(error => console.error("Error fetching CO2 levels:", error));
+    }
+
+    // Auto-refresh CO2 levels every 10 seconds
+    setInterval(updateCO2Levels, 10000);
+
+    // Fetch data immediately when the page loads
+    updateCO2Levels();
+  </script>
+
 {% endblock %}
