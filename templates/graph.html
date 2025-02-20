@@ -1,21 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>CO₂ Graph for Room {{ room }}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        iframe {
-            border: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>CO₂ Graph for Room {{ room }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap CSS CDN -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    /* Responsive iframe container */
+    .iframe-container {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+      height: 0;
+      overflow: hidden;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .iframe-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
 </head>
 <body>
-    <h1>CO₂ Graph for Room {{ room }}</h1>
-    <!-- Embed the external graph using an iframe -->
-    <iframe src="{{ graph_url }}" width="100%" height="600px"></iframe>
-    <p><a href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+  <!-- Navigation Bar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">CO₂ Dashboard</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+  
+  <div class="container my-4">
+    <h1 class="mb-4">CO₂ Graph for Room {{ room }}</h1>
+    <div class="card">
+      <div class="card-body">
+        <div class="iframe-container">
+          <iframe src="{{ graph_url }}" allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS, Popper.js, and jQuery -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

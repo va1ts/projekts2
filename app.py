@@ -104,6 +104,17 @@ def dashboard():
                     flash(f"Fan for room {room_name} is now {fan['status']}.", "success")
                     logging.info(f"Fan for room {room_name} set to {fan['status']}.")
                     break
+        
+        elif 'remove_fan' in request.form:
+            # Remove fan assignment
+            for fan in fan_assignments:
+                if fan['room'] == room_name:
+                    used_pins.discard(fan["pin"])  # Free up the GPIO pin
+                    fan_assignments.remove(fan)  # Remove from list
+                    save_fan_assignments(fan_assignments)  # Save changes
+                    flash(f"Fan removed from {room_name}.", "info")
+                    logging.info(f"Fan for room {room_name} removed.")
+                    break
 
         return redirect(url_for('dashboard'))
 
@@ -113,10 +124,10 @@ def dashboard():
             if room["roomGroupName"] == fan['room']:
                 co2_level = room.get("co2", 0)
                 if co2_level > 1000:
-                    fan['status'] = 'ON'
+                    fan['co2_level'] = co2_level
                     fan['message'] = "Fan is ON because CO2 level is above 1000ppm."
                 else:
-                    fan['status'] = 'OFF'
+                    fan['co2_level'] = co2_level
                     fan['message'] = "Fan is not needed as CO2 level is below 1000ppm."
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments)

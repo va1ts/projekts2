@@ -3,7 +3,7 @@ import logging
 import os
 
 FAN_ASSIGNMENTS_FILE = "fan_assignments.csv"
-AVAILABLE_FAN_PINS = [18, 23, 24, 25]  # List of GPIO pins for fans
+AVAILABLE_FAN_PINS = [17, 18, 23, 24, 25,]  # List of GPIO pins for fans
 
 def load_fan_assignments():
     fan_assignments = []
