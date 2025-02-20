@@ -20,22 +20,27 @@
       <button type="submit" class="btn btn-primary" name="assign_fan">Assign Fan</button>
     </form>
 
-     <!-- Fan Assignments Section -->
-     <h2>Fan Assignments</h2>
-     <ul class="list-group mt-3">
-       {% for fan in fan_assignments %}
-         <li class="list-group-item">
-           <p><strong>Room:</strong> {{ fan['room'] }}</p>
-           <p><strong>Status:</strong> {{ fan['status'] }}</p>
-           <p><strong>Message:</strong> {{ fan['message'] }}</p> <!-- Display the CO2-based message -->
-           
-          <form action="{{ url_for('dashboard') }}" method="post">
-            <input type="hidden" name="room" value="{{ fan['room'] }}">
-            <button type="submit" name="fan_control" value="on" class="btn btn-success">Turn On</button>
-            <button type="submit" name="fan_control" value="off" class="btn btn-danger">Turn Off</button>
-          </form>
-        </li>
-      {% endfor %}
-    </ul>
-  </div>
+<!-- Fan Assignments Section -->
+<h2 class="mt-4">Fan Assignments</h2>
+<ul class="list-group mt-3">
+  {% for fan in fan_assignments %}
+    <li class="list-group-item">
+      <p>
+        <strong>Room:</strong> 
+        <!-- Clickable link to view the CO₂ graph for this room -->
+        <a href="{{ url_for('room_graph', room=fan['room']) }}">{{ fan['room'] }}</a>
+      </p>
+      <p><strong>Status:</strong> {{ fan['status'] }}</p>
+      {% if fan.get('message') %}
+        <p><strong>Message:</strong> {{ fan['message'] }}</p>
+      {% endif %}
+      <form action="{{ url_for('dashboard') }}" method="post" class="mt-2">
+        <input type="hidden" name="room" value="{{ fan['room'] }}">
+        <button type="submit" name="fan_control" value="on" class="btn btn-success">Turn On</button>
+        <button type="submit" name="fan_control" value="off" class="btn btn-danger">Turn Off</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+</div>
 {% endblock %}

@@ -22,6 +22,34 @@ def home():
         return redirect(url_for('dashboard'))
     return redirect(url_for('auth.login'))
 
+@app.route('/graph/<room>')
+def room_graph(room):
+    # Ensure user is logged in
+    if 'user' not in session:
+        flash("Please log in to view the graph.", "warning")
+        return redirect(url_for('auth.login'))
+
+    # Fetch the latest room data
+    room_data = fetch_room_data()
+
+    # Look for the room using the roomGroupName (adjust if your API uses a different key)
+    device_id = None
+    for r in room_data:
+        if r.get('roomGroupName') == room:
+            # Assuming the API returns a field 'id' that corresponds to the device ID
+            device_id = r.get('id')
+            break
+
+    if not device_id:
+        flash("No graph available for this room.", "warning")
+        return redirect(url_for('dashboard'))
+
+    # Construct the URL for the external graph
+    graph_url = f"https://co2.mesh.lv/home/device-charts/{device_id}"
+
+    return render_template("graph.html", graph_url=graph_url, room=room)
+
+
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
     if 'user' not in session:
