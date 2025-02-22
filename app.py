@@ -7,7 +7,7 @@ from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FA
 from flask import jsonify
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
 
@@ -15,8 +15,6 @@ app.register_blueprint(auth)
 fan_assignments = load_fan_assignments()
 used_pins = {fan["pin"] for fan in fan_assignments}  # Track used GPIO pins
 
-# Fan assignments
-fan_assignments = []
 
 @app.route('/')
 def home():

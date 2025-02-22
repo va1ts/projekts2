@@ -8,23 +8,72 @@
 
     <!-- Custom Styles -->
     <style>
+      .custom-navbar {
+        padding: 1.5rem 2rem; /* Increase height */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Add shadow */
+        backdrop-filter: blur(10px); /* Modern background blur */
+        font-size: 1.1rem; /* Larger font */
+      }
+      /* Brand Text */
+      .brand-text {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #00d1b2 !important; /* A light teal color */
+      }
+      /* Nav Links */
+      .nav-text {
+        font-weight: 500;
+        color: #ffffff !important;
+        margin-right: 1rem;
+        transition: color 0.3s ease, transform 0.3s ease;
+      }
+      .nav-text:hover {
+        color: #00d1b2 !important;
+        transform: translateY(-2px); /* Subtle hover lift effect */
+      }
       .centered-container {
         min-height: 100vh; /* Full height of the viewport */
         display: flex;
         justify-content: center;
         align-items: center;
       }
-
       .form-card {
         width: 400px;
-        height: auto; /* You can manually set this */
+        height: auto;
         padding: 2rem;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         border-radius: 10px;
       }
-
       .custom-height {
-        height: 900px; /* Change manually if needed */
+        height: 900px;
+      }
+      /* Fix for body content shifting under fixed navbar */
+      body {
+        padding-top: 120px; /* Increased to ensure flash messages and other content are visible */
+      }
+      /* Glass Effect for Cards */
+      .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      /* Form Element Animations */
+      input.form-control, button.btn {
+        transition: all 0.3s ease;
+      }
+      input.form-control:focus {
+        border-color: #00d1b2;
+        box-shadow: 0 0 10px rgba(0, 209, 178, 0.3);
+      }
+      button.btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      /* Flash Messages Styling */
+      .alert {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
       }
     </style>
 
@@ -32,31 +81,28 @@
   </head>
   <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-      <a class="navbar-brand" href="{{ url_for('dashboard') }}">AirAware</a>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top custom-navbar">
+      <a class="navbar-brand brand-text" href="{{ url_for('dashboard') }}">AirAware</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav mr-auto">
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a class="nav-link nav-text" href="{{ url_for('dashboard') }}">Dashboard</a>
           </li>
         </ul>
         <ul class="navbar-nav">
           {% if 'user' in session %}
           <li class="nav-item">
-            <span class="navbar-text">Logged in as {{ session['user'] }}</span>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
+            <a class="nav-link nav-text" href="{{ url_for('auth.logout') }}">Logout</a>
           </li>
           {% else %}
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
+            <a class="nav-link nav-text" href="{{ url_for('auth.login') }}">Login</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
+            <a class="nav-link nav-text" href="{{ url_for('auth.register') }}">Register</a>
           </li>
           {% endif %}
         </ul>
