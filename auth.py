@@ -7,13 +7,11 @@ import re
 
 auth = Blueprint('auth', __name__)
 
-# CSV file to store user data
 USER_DB_FILE = 'users.csv'
 LOGIN_ATTEMPTS = {}
 MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_TIME = 300  # in seconds (5 minutes)
+LOCKOUT_TIME = 300  
 
-# Load users from CSV into a dictionary for easy lookup
 def load_users():
     users = {}
     try:
@@ -28,11 +26,9 @@ def load_users():
         logging.warning(f"{USER_DB_FILE} not found, starting with an empty user database.")
     return users
 
-# Save user data to CSV
 def save_user(username, password_hash, role='user'):
     with open(USER_DB_FILE, mode='a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=['username', 'password', 'role'])
-        # If the file is empty, write the header
         if file.tell() == 0:
             writer.writeheader()
         writer.writerow({'username': username, 'password': password_hash, 'role': role})
@@ -79,9 +75,9 @@ def login():
 
         if username in users and check_password_hash(users[username]['password'], password):
             session['user'] = username
-            session.permanent = remember  # Stay logged in if remember is checked
+            session.permanent = remember 
             flash("Login successful.", "success")
-            LOGIN_ATTEMPTS.pop(username, None)  # Reset login attempts
+            LOGIN_ATTEMPTS.pop(username, None) 
             return redirect(url_for('dashboard'))
         else:
             LOGIN_ATTEMPTS.setdefault(username, {'attempts': 0})
@@ -96,7 +92,6 @@ def logout():
     flash("Logged out successfully.", "success")
     return redirect(url_for('auth.login'))
 
-# Set session timeout to 30 minutes
 @auth.before_app_request
 def make_session_permanent():
     session.permanent = True

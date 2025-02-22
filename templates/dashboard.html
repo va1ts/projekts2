@@ -11,7 +11,6 @@
   <title>Dashboard</title>
   <link rel="shortcut icon" href="{{ url_for('static', filename='assets/favicon.ico') }}" type="image/x-icon">
   <style>
-    /* Import the Nunito Sans variable font */
     @font-face {
       font-family: 'Nunito Sans';
       src: url("{{ url_for('static', filename='fonts/NunitoSans-VariableFont_YTLC-opsz-wdth-wght.ttf') }}") format("truetype");
@@ -19,7 +18,6 @@
       font-style: normal;
     }
     
-    /* Global Styles */
     body {
       font-family: 'Nunito Sans', sans-serif;
       margin: 0;
@@ -34,7 +32,6 @@
       text-align: center;
     }
     
-    /* --- Assign Fan Form Styles --- */
     form.assign-fan-form {
       margin: 2rem auto 4rem auto;
       padding: 15px;
@@ -64,7 +61,6 @@
       background-color: #173777;
     }
     
-    /* --- Status Colors --- */
     .fan-status-on {
       color: green;
       font-weight: bold;
@@ -74,18 +70,16 @@
       font-weight: bold;
     }
     
-    /* --- CO₂ Level Box Styles --- */
     .co2-box {
       padding: 0.5rem 1rem;
       border-radius: 5px;
       font-weight: bold;
-      font-size: 2rem;  /* Large font for emphasis */
+      font-size: 2rem; 
       display: inline-block;
       min-width: 120px;
       text-align: center;
       margin: 0.5rem 0;
     }
-    /* Use a single neutral color scheme for the CO₂ box */
     .co2-low,
     .co2-medium,
     .co2-high,
@@ -94,7 +88,6 @@
       color: #333;
     }
     
-    /* --- Card Container & Card Styles --- */
     .card-container {
       display: flex;
       flex-wrap: wrap;
@@ -138,7 +131,6 @@
       font-size: 1.2rem;
     }
     
-    /* --- Button Styles --- */
     .btn-primary {
       background-color: #112855;
       color: #fff;
@@ -185,7 +177,6 @@
   <div class="container">
     <h1 style="margin: 2rem 0 4rem 0; border-bottom: 1px solid #777; padding-bottom: 1rem">Dashboard</h1>
     
-    <!-- Assign Fan Form -->
     <h4 style="color: #333; margin-bottom: 1.5rem;">Assign Fan to Room</h4>
     <form method="POST" class="assign-fan-form">
       <label for="room">Select Room:</label>
@@ -198,7 +189,6 @@
       <button type="submit">Assign Fan</button>
     </form>
     
-    <!-- Fan Assignments Section -->
     <h3 style="text-align: center; margin-bottom: 1.5rem;">Fan Assignments</h3>
     <div class="card-container">
       {% for fan in fan_assignments %}
