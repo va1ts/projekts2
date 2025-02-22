@@ -2,11 +2,16 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import logging
+from datetime import timedelta
+import re
 
 auth = Blueprint('auth', __name__)
 
 # CSV file to store user data
 USER_DB_FILE = 'users.csv'
+LOGIN_ATTEMPTS = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_TIME = 300  # in seconds (5 minutes)
 
 # Load users from CSV into a dictionary for easy lookup
 def load_users():
@@ -32,21 +37,28 @@ def save_user(username, password_hash, role='user'):
             writer.writeheader()
         writer.writerow({'username': username, 'password': password_hash, 'role': role})
 
+def is_strong_password(password):
+    pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
+    return re.match(pattern, password)
+
 users = load_users()
 
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].lower()
         password = request.form['password']
 
         if username in users:
             flash("Username already exists.", "warning")
             return redirect(url_for('auth.register'))
         
+        if not is_strong_password(password):
+            flash("Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.", "warning")
+            return redirect(url_for('auth.register'))
+        
         password_hash = generate_password_hash(password, method='sha256')
         save_user(username, password_hash)
-
         users[username] = {'password': password_hash, 'role': 'user'}
 
         flash("Registration successful.", "success")
@@ -57,14 +69,23 @@ def register():
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].lower()
         password = request.form['password']
+        remember = 'remember' in request.form
+
+        if username in LOGIN_ATTEMPTS and LOGIN_ATTEMPTS[username]['attempts'] >= MAX_LOGIN_ATTEMPTS:
+            flash("Account temporarily locked due to too many failed login attempts.", "danger")
+            return redirect(url_for('auth.login'))
 
         if username in users and check_password_hash(users[username]['password'], password):
             session['user'] = username
+            session.permanent = remember  # Stay logged in if remember is checked
             flash("Login successful.", "success")
+            LOGIN_ATTEMPTS.pop(username, None)  # Reset login attempts
             return redirect(url_for('dashboard'))
         else:
+            LOGIN_ATTEMPTS.setdefault(username, {'attempts': 0})
+            LOGIN_ATTEMPTS[username]['attempts'] += 1
             flash("Invalid credentials.", "danger")
 
     return render_template('login.html')
@@ -74,3 +95,9 @@ def logout():
     session.pop('user', None)
     flash("Logged out successfully.", "success")
     return redirect(url_for('auth.login'))
+
+# Set session timeout to 30 minutes
+@auth.before_app_request
+def make_session_permanent():
+    session.permanent = True
+    auth.permanent_session_lifetime = timedelta(minutes=30)
