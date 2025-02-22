@@ -143,12 +143,14 @@ def automation_worker():
                     automation_in_progress[room] = True
                     turn_fan_on(fan["pin"])
                     fan['status'] = 'ON'
+                    save_fan_assignments(fan_assignments)  # Save the ON status
                     time.sleep(5)  
                     turn_fan_off(fan["pin"])
                     fan['status'] = 'OFF'
-                    logging.info(f"Automation test for {room} complete, fan turned off.")
+                    save_fan_assignments(fan_assignments)  # Save the OFF status
+                    logging.info(f"Automation for {room} complete, fan turned off.")
                     automation_in_progress[room] = False
-                    return 
+                    return
 
                 else:
                     if fan['status'] == 'ON':
@@ -157,6 +159,7 @@ def automation_worker():
                         save_fan_assignments()
 
         time.sleep(10)
+        save_fan_assignments(fan_assignments)
 
 automation_thread = threading.Thread(target=automation_worker, daemon=True)
 automation_thread.start()
