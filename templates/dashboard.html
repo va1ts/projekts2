@@ -3,13 +3,13 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block body %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
+{% block head %}
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico') }}">
+{% endblock %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
-  <link rel="shortcut icon" href="{{ url_for('static', filename='assets/favicon.ico') }}" type="image/x-icon">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico') }}">
   <style>
     @font-face {
       font-family: 'Nunito Sans';
@@ -80,12 +80,21 @@
       text-align: center;
       margin: 0.5rem 0;
     }
-    .co2-low,
-    .co2-medium,
-    .co2-high,
+    .co2-low {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .co2-medium {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    .co2-high {
+      background-color: #f8d7da;
+      color:#721c24;
+    }
     .co2-critical {
-      background-color: #e9ecef;
-      color: #333;
+      background-color: #f5c6cb;
+      color: #721c24;
     }
     
     .card-container {
@@ -282,8 +291,31 @@
         })
         .catch(error => console.error("Error fetching fan status:", error));
     }
-    setInterval(updateFanStatus, 10000);
+    setInterval(updateFanStatus, 1000);
     updateFanStatus();
+    async function removeFan(room) {
+        try {
+            const formData = new FormData();
+            formData.append('room', room);
+            formData.append('remove_fan', 'true');
+            
+            const response = await fetch("{{ url_for('dashboard') }}", {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const card = document.querySelector(`#switch-${room}`).closest('.card');
+                card.remove();
+                // Force reload fan assignments after removal
+                await updateFanStatus();
+            } else {
+                console.error('Failed to remove fan');
+            }
+        } catch (error) {
+            console.error('Error removing fan:', error);
+        }
+    }
   </script>
 </body>
 </html>

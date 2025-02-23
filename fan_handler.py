@@ -21,11 +21,11 @@ def load_fan_assignments():
     return fan_assignments
 
 def save_fan_assignments(fan_assignments):
-    with open(FAN_ASSIGNMENTS_FILE, mode="w", newline="") as file:
-        fieldnames = ["room", "status", "pin", "co2_level"]
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
-        for fan in fan_assignments:
-            writer.writerow(fan)
-
-    logging.info("Fan assignments saved to CSV.")
+    try:
+        with open('fan_assignments.csv', 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=['room', 'status', 'pin'])
+            writer.writeheader()
+            writer.writerows(fan_assignments)
+    except Exception as e:
+        logging.error(f"Error saving fan assignments: {e}")
+        raise

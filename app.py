@@ -10,7 +10,7 @@ from flask import jsonify
 from automation import automation_worker
 
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
 
