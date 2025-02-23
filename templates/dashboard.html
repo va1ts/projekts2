@@ -200,7 +200,7 @@
             </div>
             <div>
               <span>Status:</span>
-              <span class="{{ 'fan-status-on' if fan['status'] == 'ON' else 'fan-status-off' }}">
+              <span id="status-{{ fan['room'] }}" class="{{ 'fan-status-on' if fan['status'] == 'ON' else 'fan-status-off' }}">
                 {{ fan['status'] }}
               </span>
             </div>
@@ -235,7 +235,9 @@
     </div>
   </div>
 
+  <!-- JavaScript block for polling updates -->
   <script>
+    // Update CO₂ Levels every 10 seconds
     function updateCO2Levels() {
       fetch("{{ url_for('get_co2_levels') }}")
         .then(response => response.json())
@@ -258,9 +260,30 @@
         })
         .catch(error => console.error("Error fetching CO₂ levels:", error));
     }
-  
     setInterval(updateCO2Levels, 10000);
     updateCO2Levels();
+
+    // Update Fan Status every 5 seconds
+    function updateFanStatus() {
+      fetch("{{ url_for('fan_status') }}")
+        .then(response => response.json())
+        .then(data => {
+          data.forEach(fan => {
+            let statusElement = document.getElementById(`status-${fan.room}`);
+            if (statusElement) {
+              let newStatus = fan.status;
+              let currentStatus = statusElement.innerText.trim();
+              if (currentStatus !== newStatus) {
+                statusElement.innerText = newStatus;
+                statusElement.className = (newStatus === "ON") ? "fan-status-on" : "fan-status-off";
+              }
+            }
+          });
+        })
+        .catch(error => console.error("Error fetching fan status:", error));
+    }
+    setInterval(updateFanStatus, 10000);
+    updateFanStatus();
   </script>
 </body>
 </html>

@@ -22,7 +22,7 @@ def load_fan_assignments():
 
 def save_fan_assignments(fan_assignments):
     with open(FAN_ASSIGNMENTS_FILE, mode="w", newline="") as file:
-        fieldnames = ["room", "status", "pin"]
+        fieldnames = ["room", "status", "pin", "co2_level"]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for fan in fan_assignments:

@@ -7,6 +7,7 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from flask import jsonify
+from automation import automation_worker
 
 
 app = Flask(__name__, static_folder='static')
@@ -17,6 +18,7 @@ fan_assignments = load_fan_assignments()
 used_pins = {fan["pin"] for fan in fan_assignments}
 
 automation_in_progress = {}
+fan_lock = threading.Lock()
 
 @app.route('/')
 def home():
@@ -35,6 +37,12 @@ def get_co2_levels():
         })
 
     return jsonify(co2_levels)
+
+@app.route('/api/fan_status')
+def fan_status():
+    global fan_assignments
+    fan_assignments = load_fan_assignments()
+    return jsonify(fan_assignments)
 
 @app.route('/graph/<room>')
 def room_graph(room):
@@ -63,7 +71,6 @@ def dashboard():
     
     global fan_assignments
     fan_assignments = load_fan_assignments()  
-    
     room_data = fetch_room_data()
     room_data.sort(key=lambda room: room['roomGroupName'])
 
@@ -74,8 +81,6 @@ def dashboard():
 
     if request.method == 'POST':
         room_name = request.form.get('room')
-        
-
         if 'assign_fan' in request.form:
             if any(fan['room'] == room_name for fan in fan_assignments):
                 flash("Fan is already assigned to this room.", "warning")
@@ -89,10 +94,8 @@ def dashboard():
                     fan_assignments.append({'room': room_name, 'status': 'OFF', 'pin': available_pin})
                     save_fan_assignments(fan_assignments)
                     flash(f"Fan assigned to {room_name}.", "success")
-
         elif 'fan_control' in request.form:
             action = request.form['fan_control']
-
             for fan in fan_assignments:
                 if fan['room'] == room_name:
                     if action == 'on':
@@ -101,9 +104,7 @@ def dashboard():
                     elif action == 'off':
                         turn_fan_off(fan["pin"])
                         fan['status'] = 'OFF'
-                    save_fan_assignments(fan_assignments)
-
-        
+            save_fan_assignments(fan_assignments)
         elif 'remove_fan' in request.form:
             for fan in fan_assignments:
                 if fan['room'] == room_name:
@@ -113,56 +114,18 @@ def dashboard():
                     flash(f"Fan removed from {room_name}.", "info")
                     logging.info(f"Fan for room {room_name} removed.")
                     break
-
         return redirect(url_for('dashboard'))
 
+ # Update each fan with the latest CO2 level from room_data
     for fan in fan_assignments:
         for room in room_data:
             if room["roomGroupName"] == fan['room']:
                 co2_level = room.get("co2", 0)
-                if co2_level > 1000:
-                    fan['co2_level'] = co2_level
-                else:
-                    fan['co2_level'] = co2_level
+                fan['co2_level'] = co2_level
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data = room_data)
 
-def automation_worker():
-    """Background thread to automate fan control based on CO₂ levels."""
-    while True:
-        room_data = fetch_room_data()
-        co2_lookup = {room["roomGroupName"]: room.get("co2", 0) for room in room_data}
-
-        for fan in fan_assignments:
-            room = fan['room']
-            current_co2 = co2_lookup.get(room, 0)
-
-            if not automation_in_progress.get(room, False):
-                if current_co2 >= 1000:
-                    logging.info(f"Automation triggered for {room} at CO₂ level: {current_co2} ppm")
-                    automation_in_progress[room] = True
-                    turn_fan_on(fan["pin"])
-                    fan['status'] = 'ON'
-                    save_fan_assignments(fan_assignments)  # Save the ON status
-                    time.sleep(5)  
-                    turn_fan_off(fan["pin"])
-                    fan['status'] = 'OFF'
-                    save_fan_assignments(fan_assignments)  # Save the OFF status
-                    logging.info(f"Automation for {room} complete, fan turned off.")
-                    automation_in_progress[room] = False
-                    return
-
-                else:
-                    if fan['status'] == 'ON':
-                        turn_fan_off(fan["pin"])
-                        fan['status'] = 'OFF'
-                        save_fan_assignments()
-
-        time.sleep(10)
-        save_fan_assignments(fan_assignments)
-
-automation_thread = threading.Thread(target=automation_worker, daemon=True)
-automation_thread.start()
-
 if __name__ == '__main__':
+    automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
+    automation_thread.start()
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5002)

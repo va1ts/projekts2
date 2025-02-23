@@ -1,6 +1,6 @@
-room,status,pin
-101,OFF,18
-107,OFF,23
-108,OFF,24
-111,OFF,17
-211,OFF,25
+room,status,pin,co2_level
+101,OFF,18,
+107,OFF,23,
+108,OFF,24,
+211,OFF,25,
+19,OFF,17,
