@@ -156,18 +156,22 @@
     }
     .btn-secondary {
       background-color: #fff;
-      color: #000;
-      border: none;
-      border-radius: 5px;
-      padding: 0.5rem;
+      color: #666;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      padding: 0.5rem 1.25rem;
       cursor: pointer;
-      font-size: 0.9rem;
-      flex: 1;
-      margin: 0.25rem;
+      font-size: 12px;  /* Match slider font size */
+      font-weight: bold; /* Match slider font weight */
+      transition: all 0.2s ease;
+      white-space: nowrap;
     }
     .btn-secondary:hover {
-      background-color: #bccbe7;
-      color: #000;
+      background-color: #f8f9fa;
+      color: #333;
+      border-color: #999;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     @media (max-width: 768px) {
@@ -179,6 +183,84 @@
       .card {
         flex: 0 0 100%;
       }
+    }
+
+    /* Enhanced Toggle Switch Styling */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 30px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #e0e0e0;
+      transition: .4s;
+      border-radius: 30px;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.2);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 24px;
+      width: 24px;
+      left: 3px;
+      bottom: 3px;
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
+      transition: .3s cubic-bezier(.4,0,.2,1);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* Hover effect on the switch */
+    .switch:hover .slider:before {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    /* Active state styling */
+    input:checked + .slider {
+      background: linear-gradient(145deg, #112855, #173777);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(30px);
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
+    }
+
+    /* Focus state for accessibility */
+    input:focus + .slider {
+      box-shadow: 0 0 2px #112855;
+    }
+
+    /* Optional: Add ON/OFF text */
+    .slider:after {
+      content: 'OFF';
+      position: absolute;
+      right: 8px;
+      top: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #666;
+    }
+
+    input:checked + .slider:after {
+      content: 'ON';
+      left: 8px;
+      right: auto;
+      color: #fff;
     }
   </style>
 </head>
@@ -232,11 +314,21 @@
           </div>
           
           <div class="card-footer">
-            <form action="{{ url_for('dashboard') }}" method="post" style="display: flex; width: 100%;">
-              <input type="hidden" name="room" value="{{ fan['room'] }}">
-              <button type="submit" name="fan_control" value="on" class="btn-primary">Turn On</button>
-              <button type="submit" name="fan_control" value="off" class="btn-secondary">Turn Off</button>
-              <button type="submit" name="remove_fan" class="btn-secondary">Remove</button>
+            <form onsubmit="return false;" style="display: flex; width: 100%; align-items: center; gap: 1rem;">
+                <div style="flex: 1">
+                    <label class="switch">
+                        <input type="checkbox"
+                               id="switch-{{ fan.room }}"
+                               onchange="handleFanControl('{{ fan.room }}', this.checked)"
+                               {% if fan.status == 'ON' %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div>
+                    <button type="button"
+                            onclick="removeFan('{{ fan.room }}')"
+                            class="btn-secondary">Remove</button>
+                </div>
             </form>
           </div>
         </div>
@@ -246,6 +338,39 @@
 
   <!-- JavaScript block for polling updates -->
   <script>
+    async function handleFanControl(room, isOn) {
+        try {
+            const formData = new FormData();
+            formData.append('room', room);
+            formData.append('fan_control', isOn ? 'on' : 'off');
+
+            const response = await fetch("{{ url_for('dashboard') }}", {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const statusElement = document.getElementById(`status-${room}`);
+                const newStatus = isOn ? 'ON' : 'OFF';
+                statusElement.innerText = newStatus;
+                statusElement.className = isOn ? 'fan-status-on' : 'fan-status-off';
+            } else {
+                console.error('Failed to update fan status');
+                // Revert the toggle if the request failed
+                document.getElementById(`switch-${room}`).checked = !isOn;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            // Revert the toggle if there was an error
+            document.getElementById(`switch-${room}`).checked = !isOn;
+        }
+    }
+
     // Update CO₂ Levels every 10 seconds
     function updateCO2Levels() {
       fetch("{{ url_for('get_co2_levels') }}")
@@ -274,22 +399,29 @@
 
     // Update Fan Status every 5 seconds
     function updateFanStatus() {
-      fetch("{{ url_for('fan_status') }}")
-        .then(response => response.json())
-        .then(data => {
-          data.forEach(fan => {
-            let statusElement = document.getElementById(`status-${fan.room}`);
-            if (statusElement) {
-              let newStatus = fan.status;
-              let currentStatus = statusElement.innerText.trim();
-              if (currentStatus !== newStatus) {
-                statusElement.innerText = newStatus;
-                statusElement.className = (newStatus === "ON") ? "fan-status-on" : "fan-status-off";
-              }
-            }
-          });
-        })
-        .catch(error => console.error("Error fetching fan status:", error));
+        fetch("{{ url_for('fan_status') }}")
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(fan => {
+                    let statusElement = document.getElementById(`status-${fan.room}`);
+                    let switchElement = document.getElementById(`switch-${fan.room}`);
+                    
+                    if (statusElement && switchElement) {
+                        let newStatus = fan.status;
+                        let currentStatus = statusElement.innerText.trim();
+                        
+                        if (currentStatus !== newStatus) {
+                            // Update status text and class
+                            statusElement.innerText = newStatus;
+                            statusElement.className = (newStatus === "ON") ? "fan-status-on" : "fan-status-off";
+                            
+                            // Update switch position
+                            switchElement.checked = newStatus === "ON";
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error("Error fetching fan status:", error));
     }
     setInterval(updateFanStatus, 1000);
     updateFanStatus();
@@ -301,19 +433,29 @@
             
             const response = await fetch("{{ url_for('dashboard') }}", {
                 method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: formData
             });
             
-            if (response.ok) {
+            const data = await response.json();
+            
+            if (data.success) {
+                // Remove the card immediately
                 const card = document.querySelector(`#switch-${room}`).closest('.card');
                 card.remove();
-                // Force reload fan assignments after removal
-                await updateFanStatus();
+                
+                // Stop any ongoing automation
+                clearInterval(window[`automation_${room}`]);
+                
+                console.log(data.message);
             } else {
-                console.error('Failed to remove fan');
+                throw new Error(data.error || 'Failed to remove fan');
             }
         } catch (error) {
-            console.error('Error removing fan:', error);
+            console.error('Error:', error);
+            alert('Failed to remove fan. Please try again.');
         }
     }
   </script>

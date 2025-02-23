@@ -7,7 +7,8 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from flask import jsonify
-from automation import automation_worker
+from automation import automation_worker, manual_control
+
 
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -95,26 +96,47 @@ def dashboard():
                     save_fan_assignments(fan_assignments)
                     flash(f"Fan assigned to {room_name}.", "success")
         elif 'fan_control' in request.form:
-            action = request.form['fan_control']
-            for fan in fan_assignments:
-                if fan['room'] == room_name:
-                    if action == 'on':
-                        turn_fan_on(fan["pin"]) 
-                        fan['status'] = 'ON'
-                    elif action == 'off':
-                        turn_fan_off(fan["pin"])
-                        fan['status'] = 'OFF'
-            save_fan_assignments(fan_assignments)
-        elif 'remove_fan' in request.form:
-            for fan in fan_assignments:
-                if fan['room'] == room_name:
-                    used_pins.discard(fan["pin"]) 
-                    fan_assignments.remove(fan)
-                    save_fan_assignments(fan_assignments) 
-                    flash(f"Fan removed from {room_name}.", "info")
-                    logging.info(f"Fan for room {room_name} removed.")
-                    break
-        return redirect(url_for('dashboard'))
+            action = request.form.get('fan_control')
+            try:
+                with fan_lock:
+                    for fan in fan_assignments:
+                        if fan['room'] == room_name:
+                            if action == 'on':
+                                turn_fan_on(fan["pin"])
+                                fan['status'] = 'ON'
+                            elif action == 'off':
+                                turn_fan_off(fan["pin"])
+                                fan['status'] = 'OFF'
+                            save_fan_assignments(fan_assignments)
+                            return jsonify({
+                                "success": True,
+                                "status": fan['status']
+                            })
+                    return jsonify({"success": False, "error": "Fan not found"})
+            except Exception as e:
+                logging.error(f"Error controlling fan: {e}")
+                return jsonify({"success": False, "error": str(e)}), 500
+        elif 'fan_control' in request.form:
+            action = request.form.get('fan_control')
+            try:
+                with fan_lock:
+                    for fan in fan_assignments:
+                        if fan['room'] == room_name:
+                            if action == 'on':
+                                turn_fan_on(fan["pin"])
+                                fan['status'] = 'ON'
+                                manual_control[room_name] = True  # Mark as manually controlled
+                            elif action == 'off':
+                                turn_fan_off(fan["pin"])
+                                fan['status'] = 'OFF'
+                                manual_control.pop(room_name, None)  # Remove manual control tracking
+                            save_fan_assignments(fan_assignments)
+                            return jsonify({"success": True, "status": fan['status']})
+                return jsonify({"success": False, "error": "Fan not found"})
+            except Exception as e:
+                logging.error(f"Error controlling fan: {e}")
+                return jsonify({"success": False, "error": str(e)}), 500
+            return redirect(url_for('dashboard'))
 
  # Update each fan with the latest CO2 level from room_data
     for fan in fan_assignments:
