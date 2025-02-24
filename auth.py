@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
 import logging
 from datetime import timedelta
 import re
+import requests
 
 auth = Blueprint('auth', __name__)
 
@@ -39,9 +40,30 @@ def is_strong_password(password):
 
 users = load_users()
 
+def verify_recaptcha(token):
+    """Verify reCAPTCHA token with Google."""
+    secret_key = current_app.config.get("RECAPTCHA_SECRET_KEY")
+    if not secret_key:
+        logging.error("RECAPTCHA_SECRET_KEY not set in configuration.")
+        return False
+
+    data = {
+        'secret': secret_key,
+        'response': token
+    }
+    r = requests.post("https://www.google.com/recaptcha/api/siteverify", data=data)
+    result = r.json()
+    return result.get("success", False)
+
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # Verify the captcha response first.
+        recaptcha_token = request.form.get("g-recaptcha-response")
+        if not recaptcha_token or not verify_recaptcha(recaptcha_token):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return redirect(url_for('auth.register'))
+
         username = request.form['username'].lower()
         password = request.form['password']
 
@@ -65,6 +87,12 @@ def register():
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Verify the captcha response first.
+        recaptcha_token = request.form.get("g-recaptcha-response")
+        if not recaptcha_token or not verify_recaptcha(recaptcha_token):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return redirect(url_for('auth.login'))
+
         username = request.form['username'].lower()
         password = request.form['password']
         remember = 'remember' in request.form
@@ -75,6 +103,7 @@ def login():
 
         if username in users and check_password_hash(users[username]['password'], password):
             session['user'] = username
+            session['role'] = users[username]['role']
             session.permanent = remember 
             flash("Login successful.", "success")
             LOGIN_ATTEMPTS.pop(username, None) 

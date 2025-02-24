@@ -14,8 +14,11 @@ logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
+app.config['RECAPTCHA_SECRET_KEY'] = '6Le_EOEqAAAAAMF01hc48sEDe9dTFYeL7xYahVV5'
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
+
+
 
 # Cache fan assignments in memory to avoid reading the file for every request.
 fan_assignments = load_fan_assignments()
@@ -29,6 +32,7 @@ def home():
     if 'user' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('auth.login'))
+
 
 @app.route('/api/available_rooms')
 def available_rooms():

@@ -2,26 +2,39 @@
 
 {% block title %}Login{% endblock %}
 
+{% block head %}
+  {{ super() }}
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endblock %}
+
 {% block body %}
   <div class="d-flex justify-content-center align-items-center min-vh-100">
-    <div class="card p-4 shadow-lg glass-card" style="width: 500px;">
-      <h1 class="text-center mb-4 text-primary">Welcome Back</h1>
-
-      <form method="post" class="animate__animated animate__fadeIn">  
+    <div class="card p-4 shadow-lg glass-card" style="width: 400px;">
+      <h1 class="text-center mb-4 text-primary">Welcome Back!</h1>
+      <form method="post" id="auth-form">
         <div class="form-group">
           <label for="username">Username</label>
-          <input type="text" class="form-control" id="username" name="username" required>
+          <input type="text" name="username" class="form-control" required autofocus>
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" class="form-control" id="password" name="password" required>
+          <input type="password" name="password" class="form-control" required>
         </div>
         <div class="form-check">
-          <input type="checkbox" class="form-check-input" id="remember" name="remember">
-          <label class="form-check-label" for="remember">Remember me</label>
+          <input type="checkbox" name="remember" class="form-check-input" id="remember">
+          <label for="remember" class="form-check-label">Remember me</label>
         </div>
-        <button type="submit" class="btn btn-primary w-100">Login</button>
+        <!-- Google reCAPTCHA widget -->
+        <div class="g-recaptcha" data-sitekey="6Le_EOEqAAAAAMF01hc48sEDe9dTFYeL7xYahVV5" data-callback="onSubmit"></div>
+        <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+        <button type="submit" class="btn btn-primary w-100 mt-3">Login</button>
       </form>
     </div>
   </div>
+  <script>
+  function onSubmit(token) {
+    document.getElementById("g-recaptcha-response").value = token;
+    document.getElementById("auth-form").submit();
+  }
+  </script>
 {% endblock %}
