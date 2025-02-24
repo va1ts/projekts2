@@ -14,11 +14,8 @@ logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
-app.config['RECAPTCHA_SECRET_KEY'] = '6Le_EOEqAAAAAMF01hc48sEDe9dTFYeL7xYahVV5'
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
-
-
 
 # Cache fan assignments in memory to avoid reading the file for every request.
 fan_assignments = load_fan_assignments()
@@ -32,7 +29,6 @@ def home():
     if 'user' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('auth.login'))
-
 
 @app.route('/api/available_rooms')
 def available_rooms():
@@ -86,34 +82,35 @@ def dashboard():
 
     global fan_assignments
     fan_assignments = load_fan_assignments()
-    room_data = fetch_room_data_cached()
-    room_data.sort(key=lambda room: room['roomGroupName'])
-
-    available_rooms = [
-        room for room in room_data
-        if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)
-    ]
 
     if request.method == 'POST':
-        room_name = request.form.get('room')
-        # Fan assignment branch
         if 'assign_fan' in request.form:
+            room_name = request.form.get('room')
             if any(fan['room'] == room_name for fan in fan_assignments):
-                flash("Fan is already assigned to this room.", "warning")
-            else:
-                available_pin = next((p for p in AVAILABLE_FAN_PINS if p not in used_pins), None)
-                if available_pin is None:
-                    flash("No available fans left.", "danger")
-                else:
-                    used_pins.add(available_pin)
-                    initialize_fan(available_pin)
-                    fan_assignments.append({'room': room_name, 'status': 'OFF', 'pin': available_pin})
-                    save_fan_assignments(fan_assignments)
-                    flash(f"Fan assigned to {room_name}.", "success")
-            return redirect(url_for('dashboard'))
+                return jsonify({'success': False, 'error': "Fan is already assigned to this room."})
+            
+            available_pin = next((p for p in AVAILABLE_FAN_PINS if p not in used_pins), None)
+            if available_pin is None:
+                return jsonify({'success': False, 'error': "No available fans left."})
+            
+            try:
+                used_pins.add(available_pin)
+                initialize_fan(available_pin)
+                new_fan = {'room': room_name, 'status': 'OFF', 'pin': available_pin}
+                fan_assignments.append(new_fan)
+                save_fan_assignments(fan_assignments)
+                
+                return jsonify({
+                    'success': True,
+                    'message': f"Fan assigned to {room_name}.",
+                    'fan': new_fan
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
 
         # Fan control branch
         elif 'fan_control' in request.form:
+            room_name = request.form.get('room')
             action = request.form.get('fan_control')
             try:
                 with fan_lock:
@@ -136,6 +133,7 @@ def dashboard():
 
         # Fan removal branch
         elif 'remove_fan' in request.form:
+            room_name = request.form.get('room')
             try:
                 with fan_lock:
                     fan_to_remove = next((fan for fan in fan_assignments if fan['room'] == room_name), None)
@@ -154,6 +152,14 @@ def dashboard():
                 return jsonify({"success": False, "error": str(e)}), 500
 
     # Update CO2 levels in fan_assignments before rendering
+    room_data = fetch_room_data_cached()
+    room_data.sort(key=lambda room: room['roomGroupName'])
+
+    available_rooms = [
+        room for room in room_data
+        if not any(fan['room'] == room['roomGroupName'] for fan in fan_assignments)
+    ]
+
     for fan in fan_assignments:
         for room in room_data:
             if room["roomGroupName"] == fan['room']:

@@ -9,6 +9,7 @@
   <title>Dashboard</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='assets/favicon.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}
 
 {% block body %}
@@ -16,7 +17,7 @@
     <h1 style="margin: 2rem 0 4rem 0; border-bottom: 1px solid #777; padding-bottom: 1rem">Dashboard</h1>
     
     <h4 style="color: #333; margin-bottom: 1.5rem;">Assign Fan to Room</h4>
-    <form method="POST" class="assign-fan-form">
+    <form method="POST" class="assign-fan-form" id="assignFanForm" onsubmit="handleAssignFan(event)">
       <label for="room">Select Room:</label>
       <select name="room" id="room">
         {% for room in rooms %}
@@ -82,141 +83,4 @@
       {% endfor %}
     </div>
   </div>
-
-  <!-- JavaScript block for polling updates -->
-  <script>
-    async function handleFanControl(room, isOn) {
-        try {
-            const formData = new FormData();
-            formData.append('room', room);
-            formData.append('fan_control', isOn ? 'on' : 'off');
-
-            const response = await fetch("{{ url_for('dashboard') }}", {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                const statusElement = document.getElementById(`status-${room}`);
-                const newStatus = isOn ? 'ON' : 'OFF';
-                statusElement.innerText = newStatus;
-                statusElement.className = isOn ? 'fan-status-on' : 'fan-status-off';
-            } else {
-                console.error('Failed to update fan status');
-                // Revert the toggle if the request failed
-                document.getElementById(`switch-${room}`).checked = !isOn;
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            // Revert the toggle if there was an error
-            document.getElementById(`switch-${room}`).checked = !isOn;
-        }
-    }
-
-    // Update CO₂ Levels every 10 seconds
-    function updateCO2Levels() {
-      fetch("{{ url_for('get_co2_levels') }}")
-        .then(response => response.json())
-        .then(data => {
-          data.forEach(room => {
-            let co2Element = document.getElementById(`co2-${room.roomGroupName}`);
-            if (co2Element) {
-              co2Element.innerText = room.co2 + " ppm";
-              if (room.co2 < 1000) {
-                co2Element.className = "co2-box co2-low";
-              } else if (room.co2 < 1500) {
-                co2Element.className = "co2-box co2-medium";
-              } else if (room.co2 < 2000) {
-                co2Element.className = "co2-box co2-high";
-              } else {
-                co2Element.className = "co2-box co2-critical";
-              }
-            }
-          });
-        })
-        .catch(error => console.error("Error fetching CO₂ levels:", error));
-    }
-    setInterval(updateCO2Levels, 10000);
-    updateCO2Levels();
-
-    // Update Fan Status every 5 seconds
-    function updateFanStatus() {
-        fetch("{{ url_for('fan_status') }}")
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(fan => {
-                    let statusElement = document.getElementById(`status-${fan.room}`);
-                    let switchElement = document.getElementById(`switch-${fan.room}`);
-                    
-                    if (statusElement && switchElement) {
-                        let newStatus = fan.status;
-                        let currentStatus = statusElement.innerText.trim();
-                        
-                        if (currentStatus !== newStatus) {
-                            // Update status text and class
-                            statusElement.innerText = newStatus;
-                            statusElement.className = (newStatus === "ON") ? "fan-status-on" : "fan-status-off";
-                            
-                            // Update switch position
-                            switchElement.checked = newStatus === "ON";
-                        }
-                    }
-                });
-            })
-            .catch(error => console.error("Error fetching fan status:", error));
-    }
-    setInterval(updateFanStatus, 1000);
-    updateFanStatus();
-    async function removeFan(room) {
-        try {
-            const formData = new FormData();
-            formData.append('room', room);
-            formData.append('remove_fan', 'true');
-            
-            const response = await fetch("{{ url_for('dashboard') }}", {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Remove the card immediately
-                const card = document.querySelector(`#switch-${room}`).closest('.card');
-                card.remove();
-                console.log(data.message);
-                // Now update available rooms dropdown:
-                updateAvailableRooms();
-            } else {
-                throw new Error(data.error || 'Failed to remove fan');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to remove fan. Please try again.');
-        }
-    }
-
-    async function updateAvailableRooms() {
-        try {
-            const response = await fetch("{{ url_for('available_rooms') }}");
-            const availableRooms = await response.json();
-            const select = document.getElementById("room");
-            select.innerHTML = "";
-            availableRooms.forEach(room => {
-                const option = document.createElement("option");
-                option.value = room;
-                option.textContent = room;
-                select.appendChild(option);
-            });
-        } catch (error) {
-            console.error("Error updating available rooms:", error);
-        }
-    }
-  </script>
 {% endblock %}
