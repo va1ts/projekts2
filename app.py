@@ -7,6 +7,17 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from automation import automation_worker, manual_control
+from analytics_handler import (
+    log_fan_action,
+    calculate_total_runtime,
+    calculate_runtime_today,
+    get_last_active,
+    load_runtime_log,
+    calculate_efficiency,
+    calculate_co2_reduction
+)
+
+
 
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
@@ -116,10 +127,12 @@ def dashboard():
                                 turn_fan_on(fan["pin"])
                                 fan['status'] = 'ON'
                                 manual_control[room_name] = True
+                                log_fan_action(room_name, 'ON')
                             elif action == 'off':
                                 turn_fan_off(fan["pin"])
                                 fan['status'] = 'OFF'
                                 manual_control.pop(room_name, None)
+                                log_fan_action(room_name, 'OFF')
                             save_fan_assignments(fan_assignments)
                             return jsonify({"success": True, "status": fan['status']})
                     return jsonify({"success": False, "error": "Fan not found"})
@@ -160,6 +173,79 @@ def dashboard():
                 fan['co2_level'] = room.get("co2", 0)
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data=room_data)
+
+@app.route('/analytics')
+def analytics():
+    if 'user' not in session:
+        flash("Please log in to access analytics.", "warning")
+        return redirect(url_for('auth.login'))
+    
+    fan_data = load_fan_assignments()
+    room_data = fetch_room_data_cached()
+    
+    active_fans = sum(1 for fan in fan_data if fan['status'] == 'ON')
+    
+    analytics_data = {
+        'totalRuntime': calculate_total_runtime(),
+        'activeFans': f"{active_fans}/{len(fan_data)}",
+        'efficiency': calculate_efficiency(room_data, fan_data),
+        'fans': []
+    }
+
+    for fan in fan_data:
+        room_co2 = next(
+            (room['co2'] for room in room_data 
+             if room['roomGroupName'] == fan['room']), 
+            0
+        )
+        
+        fan_info = {
+            'room': fan['room'],
+            'status': fan['status'],
+            'runtimeToday': calculate_runtime_today(fan),
+            'lastActive': get_last_active(fan),
+            'co2Reduced': calculate_co2_reduction(room_co2, fan)
+        }
+        analytics_data['fans'].append(fan_info)
+    
+    return render_template('analytics.html', analytics=analytics_data)
+
+# Add a new route for API updates
+@app.route('/api/analytics')
+def get_fan_analytics():
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Same code as above but returns JSON
+    fan_data = load_fan_assignments()
+    room_data = fetch_room_data_cached()
+    
+    active_fans = sum(1 for fan in fan_data if fan['status'] == 'ON')
+    
+    analytics_data = {
+        'totalRuntime': calculate_total_runtime(),
+        'activeFans': f"{active_fans}/{len(fan_data)}",
+        'efficiency': calculate_efficiency(room_data, fan_data),
+        'fans': []
+    }
+
+    for fan in fan_data:
+        room_co2 = next(
+            (room['co2'] for room in room_data 
+             if room['roomGroupName'] == fan['room']), 
+            0
+        )
+        
+        fan_info = {
+            'room': fan['room'],
+            'status': fan['status'],
+            'runtimeToday': calculate_runtime_today(fan),
+            'lastActive': get_last_active(fan),
+            'co2Reduced': calculate_co2_reduction(room_co2, fan)
+        }
+        analytics_data['fans'].append(fan_info)
+    
+    return jsonify(analytics_data)
 
 if __name__ == '__main__':
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
