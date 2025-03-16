@@ -1,32 +1,60 @@
 from datetime import datetime
-import csv
-import os
+import sqlite3
+import logging
 
-FAN_ASSIGNMENTS_FILE = "fan_assignments.csv"
-RUNTIME_LOG_FILE = "fan_runtime_log.csv"
+DB_FILE = 'airaware.db'
+
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def load_runtime_log():
-    if not os.path.exists(RUNTIME_LOG_FILE):
-        with open(RUNTIME_LOG_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['room', 'action', 'timestamp'])
-    
-    runtime_log = {}
-    with open(RUNTIME_LOG_FILE, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Ensure the table exists
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS fan_runtime_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room TEXT NOT NULL,
+                action TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+        ''')
+        
+        cursor.execute('SELECT room, action, timestamp FROM fan_runtime_log')
+        rows = cursor.fetchall()
+        
+        runtime_log = {}
+        for row in rows:
             if row['room'] not in runtime_log:
                 runtime_log[row['room']] = []
             runtime_log[row['room']].append({
                 'action': row['action'],
                 'timestamp': datetime.fromisoformat(row['timestamp'])
             })
-    return runtime_log
+        
+        conn.close()
+        return runtime_log
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")
+        return {}
 
 def log_fan_action(room, action):
-    with open(RUNTIME_LOG_FILE, 'a', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow([room, action, datetime.now().isoformat()])
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO fan_runtime_log (room, action, timestamp) VALUES (?, ?, ?)',
+            (room, action, datetime.now().isoformat())
+        )
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error logging fan action: {e}")
+        raise
 
 def calculate_runtime_today(fan):
     runtime_log = load_runtime_log()
@@ -49,7 +77,6 @@ def calculate_runtime_today(fan):
             total_runtime += runtime
             last_on = None
     
-    # If fan is still running
     if last_on and fan['status'] == 'ON':
         current_runtime = (datetime.now() - last_on).total_seconds() / 3600
         total_runtime += current_runtime

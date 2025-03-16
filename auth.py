@@ -1,37 +1,51 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 import csv
+import sqlite3
 import logging
 from datetime import timedelta
 import re
 
 auth = Blueprint('auth', __name__)
 
-USER_DB_FILE = 'users.csv'
+DB_FILE = 'airaware.db'
 LOGIN_ATTEMPTS = {}
 MAX_LOGIN_ATTEMPTS = 5
-LOCKOUT_TIME = 300  
+LOCKOUT_TIME = 300
+
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def load_users():
-    users = {}
     try:
-        with open(USER_DB_FILE, mode='r') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                users[row['username']] = {
-                    'password': row['password'],
-                    'role': row['role']
-                }
-    except FileNotFoundError:
-        logging.warning(f"{USER_DB_FILE} not found, starting with an empty user database.")
-    return users
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users')
+        users = {row['username']: {
+            'password': row['password'],
+            'role': row['role']
+        } for row in cursor.fetchall()}
+        conn.close()
+        return users
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")
+        return {}
 
 def save_user(username, password_hash, role='user'):
-    with open(USER_DB_FILE, mode='a', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=['username', 'password', 'role'])
-        if file.tell() == 0:
-            writer.writeheader()
-        writer.writerow({'username': username, 'password': password_hash, 'role': role})
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+            (username, password_hash, role)
+        )
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving user: {e}")
+        raise
 
 def is_strong_password(password):
     pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'

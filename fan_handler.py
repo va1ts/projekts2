@@ -1,37 +1,81 @@
-import csv
 import logging
-import os
+import sqlite3
 
-FAN_ASSIGNMENTS_FILE = "fan_assignments.csv"
 AVAILABLE_FAN_PINS = [18, 17, 23, 24, 25]
+DB_FILE = 'airaware.db'
+
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def load_fan_assignments():
+    logging.info("Loading fan assignments from database")
     fan_assignments = []
     try:
-        if os.path.exists(FAN_ASSIGNMENTS_FILE) and os.path.getsize(FAN_ASSIGNMENTS_FILE) > 0:
-            with open(FAN_ASSIGNMENTS_FILE, "r") as file:
-                # Skip empty lines and ensure headers are read correctly
-                reader = csv.DictReader((line for line in file if line.strip()))
-                for row in reader:
-                    try:
-                        fan_assignments.append({
-                            "room": str(row.get("room", "")),
-                            "status": str(row.get("status", "OFF")),
-                            "pin": int(row.get("pin", 0))
-                        })
-                    except (ValueError, KeyError) as e:
-                        logging.error(f"Error reading row {row}: {e}")
-                        continue
-    except FileNotFoundError:
-        logging.warning(f"{FAN_ASSIGNMENTS_FILE} not found. No fan assignments loaded.")
-    return fan_assignments
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT room, status, pin FROM fan_assignments')
+        rows = cursor.fetchall()
+        
+        for row in rows:
+            fan_assignments.append({
+                'room': row['room'],
+                'status': row['status'],
+                'pin': row['pin']
+            })
+        conn.close()
+        return fan_assignments
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")
+        return []
+
+def vacuum_database():
+    conn = None
+    try:
+        conn = get_db()
+        conn.execute('VACUUM')
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error vacuuming database: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def save_fan_assignments(fan_assignments):
+    conn = None
     try:
-        with open(FAN_ASSIGNMENTS_FILE, 'w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=['room', 'status', 'pin'])
-            writer.writeheader()
-            writer.writerows(fan_assignments)
-    except Exception as e:
-        logging.error(f"Error saving fan assignments: {e}")
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Begin transaction
+        cursor.execute('BEGIN TRANSACTION')
+        
+        # Clear existing assignments
+        cursor.execute('DELETE FROM fan_assignments')
+        
+        # Insert new assignments
+        for fan in fan_assignments:
+            cursor.execute(
+                'INSERT INTO fan_assignments (room, status, pin) VALUES (?, ?, ?)',
+                (fan['room'], fan['status'], fan['pin'])
+            )
+        
+        # Verify the number of inserted rows
+        cursor.execute('SELECT COUNT(*) FROM fan_assignments')
+        count = cursor.fetchone()[0]
+        if count != len(fan_assignments):
+            raise sqlite3.Error(f"Database synchronization error: Expected {len(fan_assignments)} rows, got {count}")
+            
+        # Commit transaction
+        conn.commit()
+        logging.info(f"Successfully saved {count} fan assignments")
+        
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+        logging.error(f"Database error in save_fan_assignments: {e}")
         raise
+    finally:
+        if conn:
+            conn.close()

@@ -16,8 +16,7 @@ from analytics_handler import (
     calculate_efficiency,
     calculate_co2_reduction
 )
-
-
+import os
 
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
@@ -26,6 +25,17 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
+
+# Add this after app initialization
+DB_FILE = 'airaware.db'
+if not os.path.exists(DB_FILE):
+    from airaware import init_database
+    init_database()
+
+# Verify database is writable
+if not os.access(DB_FILE, os.W_OK):
+    logging.error(f"Database file {DB_FILE} is not writable!")
+    raise PermissionError(f"Database file {DB_FILE} is not writable!")
 
 fan_assignments = load_fan_assignments()
 used_pins = {fan["pin"] for fan in fan_assignments}
@@ -38,6 +48,18 @@ def home():
     if 'user' in session:
         return redirect(url_for('dashboard'))
     return redirect(url_for('auth.login'))
+
+@app.route("/schedule")
+def schedule():
+    return render_template("schedule.html")
+
+@app.route("/settings")
+def settings():
+    return render_template("settings.html")
+
+@app.route("/alerts")
+def alerts():
+    return render_template("alerts.html")
 
 @app.route('/api/available_rooms')
 def available_rooms():
@@ -62,7 +84,7 @@ def get_co2_levels():
 def fan_status():
     global fan_assignments
     fan_assignments = load_fan_assignments()
-    return jsonify(fan_assignments)
+    return jsonify(fan_assignments) 
 
 @app.route('/graph/<room>')
 def room_graph(room):
