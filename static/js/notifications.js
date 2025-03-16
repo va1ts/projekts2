@@ -69,7 +69,7 @@ class NotificationManager {
             }, 300);
         };
 
-        setTimeout(removeNotification, 5000);
+        setTimeout(removeNotification, 1000);
 
         // Click to dismiss
         notification.addEventListener('click', () => {

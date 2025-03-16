@@ -7,101 +7,131 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 
     <style>
-      .custom-navbar {
-        padding: 1.5rem 2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        backdrop-filter: blur(10px); 
-        font-size: 1.1rem; 
+      /* Replace existing navbar styles with these */
+      .side-navbar {
+        height: 100%;
+        width: 250px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: #112855;
+        padding-top: 20px;
+        transition: 0.3s;
+        transform: translateX(-200px);
+        z-index: 1000;
       }
-      .brand-text {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: #00d1b2 !important; 
+
+      .side-navbar:hover {
+        transform: translateX(0);
       }
-      .nav-text {
-        font-weight: 500;
-        color: #ffffff !important;
-        margin-right: 1rem;
-        transition: color 0.3s ease, transform 0.3s ease;
+
+      .side-navbar .brand-text {
+        padding: 15px 25px;
+        margin-bottom: 20px;
+        color: #00d1b2;
+        font-size: 1.5rem;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
       }
-      .nav-text:hover {
-        color: #00d1b2 !important;
-        transform: translateY(-2px); 
+
+      .nav-menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
       }
-      .centered-container {
-        min-height: 100vh; 
+
+      .nav-item {
+        padding: 0;
+        margin: 0;
+      }
+
+      .nav-link {
         display: flex;
-        justify-content: center;
         align-items: center;
+        padding: 15px 25px;
+        color: #fff;
+        text-decoration: none;
+        transition: 0.3s;
       }
-      .form-card {
-        width: 400px;
-        height: auto;
-        padding: 2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        border-radius: 10px;
+
+      .nav-link i {
+        margin-right: 10px;
+        width: 20px;
+        text-align: center;
       }
-      .custom-height {
-        height: 900px;
+
+      .nav-link:hover {
+        background: rgba(0,209,178,0.1);
+        color: #00d1b2;
       }
+
+      .main-content {
+        margin-left: 50px;
+        padding: 20px;
+        transition: 0.3s;
+      }
+
+      .side-navbar:hover + .main-content {
+        margin-left: 250px;
+      }
+
       body {
-        padding-top: 120px; 
-      }
-      .glass-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-      }
-      input.form-control, button.btn {
-        transition: all 0.3s ease;
-      }
-      input.form-control:focus {
-        border-color: #00d1b2;
-        box-shadow: 0 0 10px rgba(0, 209, 178, 0.3);
-      }
-      button.btn:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-      }
-      .alert {
-        font-size: 0.9rem;
-        padding: 0.75rem 1rem;
+        padding-top: 0;
       }
     </style>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     {% block head %}{% endblock %}
   </head>
   <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top custom-navbar">
-      <a class="navbar-brand brand-text" href="{{ url_for('dashboard') }}">AirAware</a>
-      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav mr-auto">
-          <li class="nav-item">
-            <a class="nav-link nav-text" href="{{ url_for('dashboard') }}">Dashboard</a>
-          </li>
-        </ul>
-        <ul class="navbar-nav">
-          {% if 'user' in session %}
-          <li class="nav-item">
-            <a class="nav-link nav-text" href="{{ url_for('auth.logout') }}">Logout</a>
-          </li>
-          {% else %}
-          <li class="nav-item">
-            <a class="nav-link nav-text" href="{{ url_for('auth.login') }}">Login</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link nav-text" href="{{ url_for('auth.register') }}">Register</a>
-          </li>
-          {% endif %}
-        </ul>
-      </div>
+    <nav class="side-navbar">
+      <div class="brand-text">AirAware</div>
+      <ul class="nav-menu">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('dashboard') }}">
+            <i class="fas fa-home"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/analytics">
+            <i class="fas fa-chart-line"></i> Analytics
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/schedule">
+            <i class="fas fa-clock"></i> Schedule
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/alerts">
+            <i class="fas fa-bell"></i> Alerts
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/settings">
+            <i class="fas fa-cog"></i> Settings
+          </a>
+        </li>
+        {% if 'user' in session %}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.logout') }}">
+            <i class="fas fa-sign-out-alt"></i> Logout
+          </a>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.login') }}">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.register') }}">
+            <i class="fas fa-user-plus"></i> Register
+          </a>
+        </li>
+        {% endif %}
+      </ul>
     </nav>
-    
-    <div class="container centered-container">
+
+    <div class="main-content">
       {% block body %}{% endblock %}
     </div>
 
