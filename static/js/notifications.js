@@ -1,6 +1,8 @@
 class NotificationManager {
-    constructor() {
+    constructor(maxNotifications = 3) {
         this.container = this.createContainer();
+        this.maxNotifications = maxNotifications;
+        this.activeNotifications = 0;
     }
 
     createContainer() {
@@ -14,6 +16,14 @@ class NotificationManager {
     }
 
     show(message, type = 'info') {
+        if (this.activeNotifications >= this.maxNotifications) {
+            const oldestNotification = this.container.firstChild;
+            if (oldestNotification) {
+                oldestNotification.remove();
+                this.activeNotifications--;
+            }
+        }
+
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
@@ -40,6 +50,7 @@ class NotificationManager {
 
 
         this.container.appendChild(notification);
+        this.activeNotifications++;
 
         // Trigger animation
         setTimeout(() => {
@@ -48,12 +59,17 @@ class NotificationManager {
         }, 50);
 
         // Auto-remove after 5 seconds
-        setTimeout(() => {
+        const removeNotification = () => {
             notification.classList.remove('show');
             notification.style.opacity = '0';
             notification.style.transform = 'translateY(-20px)';
-            setTimeout(() => notification.remove(), 300);
-        }, 5000);
+            setTimeout(() => {
+                notification.remove();
+                this.activeNotifications--;
+            }, 300);
+        };
+
+        setTimeout(removeNotification, 5000);
 
         // Click to dismiss
         notification.addEventListener('click', () => {
@@ -62,8 +78,9 @@ class NotificationManager {
             notification.style.transform = 'translateY(-20px)';
             setTimeout(() => notification.remove(), 300);
         });
+        notification.addEventListener('click', removeNotification);
     }
 }
 
 // Initialize the notification manager globally
-window.notifications = new NotificationManager();
+window.notifications = new NotificationManager(3);
