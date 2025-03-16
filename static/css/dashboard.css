@@ -323,3 +323,10 @@
   .notification.info {
       background: linear-gradient(135deg, #2196f3, #1e88e5);
   }
+  .dashboard-logo {
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 2rem auto;
+}
