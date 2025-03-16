@@ -22,9 +22,11 @@ async function handleFanControl(room, isOn) {
 function handleFanControlResponse(data, room, isOn) {
     if (data.success) {
         updateFanStatus(room, isOn);
+        window.notifications.show(`Fan in ${room} ${isOn ? 'turned on' : 'turned off'}`, 'success');
     } else {
         console.error('Failed to update fan status');
         revertFanSwitch(room, !isOn);
+        window.notifications.show('Failed to update fan status', 'error');
     }
 }
 
@@ -125,8 +127,10 @@ function handleRemoveFanResponse(data, room) {
     if (data.success) {
         document.querySelector(`#switch-${room}`).closest('.card').remove();
         updateAvailableRooms();
+        window.notifications.show(`Fan removed from ${room}`, 'success');
     } else {
         console.error(data.error || 'Failed to remove fan');
+        window.notifications.show(data.error || 'Failed to remove fan', 'error');
     }
 }
 
@@ -222,11 +226,14 @@ async function handleAssignFan(event) {
             
             // Reset the form
             form.reset();
+            window.notifications.show(`Fan successfully assigned to ${data.fan.room}`, 'success');
         } else {
             console.error(data.error || 'Failed to assign fan');
+            window.notifications.show(data.error || 'Failed to assign fan', 'error');
         }
     } catch (error) {
         console.error('Error:', error);
+        window.notifications.show('Error assigning fan', 'error');
     }
 }
 

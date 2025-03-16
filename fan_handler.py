@@ -2,7 +2,7 @@ import csv
 import logging
 
 FAN_ASSIGNMENTS_FILE = "fan_assignments.csv"
-AVAILABLE_FAN_PINS = [17, 18, 23, 24, 25]
+AVAILABLE_FAN_PINS = [18, 17, 23, 24, 25]
 
 def load_fan_assignments():
     fan_assignments = []

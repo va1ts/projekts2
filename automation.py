@@ -1,11 +1,11 @@
 import logging
 import time
 from hardware import turn_fan_on, turn_fan_off
-from api_handler import fetch_room_data_cached  # Use cached API call
+from api_handler import fetch_room_data_cached  
 from fan_handler import save_fan_assignments, load_fan_assignments
 
 automation_in_progress = {}
-manual_control = {}  # Track manually controlled fans
+manual_control = {}
 
 def automation_worker(fan_assignments, fan_lock):
     """Background thread to automate fan control based on CO₂ levels."""
@@ -15,7 +15,7 @@ def automation_worker(fan_assignments, fan_lock):
             room_data = fetch_room_data_cached()
             co2_lookup = {room["roomGroupName"]: room.get("co2", 0) for room in room_data}
             
-            # Check for removed fans
+            
             with fan_lock:
                 for room in list(automation_in_progress.keys()):
                     if not any(fan['room'] == room for fan in current_assignments):
@@ -24,7 +24,7 @@ def automation_worker(fan_assignments, fan_lock):
             
             assigned_rooms = {fan['room'] for fan in current_assignments}
 
-            # Shutdown removed fans
+            
             removed_rooms = set(automation_in_progress.keys()) - assigned_rooms
             for room in removed_rooms:
                 for fan in fan_assignments:
@@ -36,7 +36,6 @@ def automation_worker(fan_assignments, fan_lock):
                             logging.info(f"Fan for room {room} was removed, shutting down pin {fan['pin']}")
                 del automation_in_progress[room]
 
-            # Update assignments
             fan_assignments.clear()
             fan_assignments.extend(current_assignments)
 
@@ -45,7 +44,7 @@ def automation_worker(fan_assignments, fan_lock):
                 current_co2 = co2_lookup.get(room, 0)
 
                 if room in manual_control and manual_control[room]:
-                    continue  # Skip automation if manually controlled
+                    continue  
                 
                 if not automation_in_progress.get(room, False):
                     if current_co2 >= 1000:

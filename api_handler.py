@@ -2,10 +2,9 @@ import requests
 import time
 import logging
 
-# Cache data and timestamp
 _cached_room_data = None
 _last_fetch = 0
-_CACHE_DURATION = 10  # seconds
+_CACHE_DURATION = 10  
 
 def fetch_room_data_cached(building_id="512"):
     global _cached_room_data, _last_fetch

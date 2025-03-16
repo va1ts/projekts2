@@ -2,13 +2,12 @@ import logging
 import threading
 import time
 from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
-from api_handler import fetch_room_data_cached  # Updated API call with caching
+from api_handler import fetch_room_data_cached 
 from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from automation import automation_worker, manual_control
 
-# Set logging to show warnings and above.
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -17,7 +16,6 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
 
-# Cache fan assignments in memory to avoid reading the file for every request.
 fan_assignments = load_fan_assignments()
 used_pins = {fan["pin"] for fan in fan_assignments}
 
@@ -32,8 +30,7 @@ def home():
 
 @app.route('/api/available_rooms')
 def available_rooms():
-    room_data = fetch_room_data_cached()  # Use cached API call
-    # Filter out rooms that already have a fan assignment.
+    room_data = fetch_room_data_cached()
     fan_assignments = load_fan_assignments()
     assigned_rooms = {fan['room'] for fan in fan_assignments}
     available = [room['roomGroupName'] for room in room_data if room['roomGroupName'] not in assigned_rooms]
@@ -41,7 +38,7 @@ def available_rooms():
 
 @app.route('/api/get_co2_levels')
 def get_co2_levels():
-    room_data = fetch_room_data_cached()  # Use cached API call
+    room_data = fetch_room_data_cached()
     co2_levels = []
     for room in room_data:
         co2_levels.append({
@@ -108,7 +105,6 @@ def dashboard():
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        # Fan control branch
         elif 'fan_control' in request.form:
             room_name = request.form.get('room')
             action = request.form.get('fan_control')
@@ -131,7 +127,6 @@ def dashboard():
                 logging.error(f"Error controlling fan: {e}")
                 return jsonify({"success": False, "error": str(e)}), 500
 
-        # Fan removal branch
         elif 'remove_fan' in request.form:
             room_name = request.form.get('room')
             try:
@@ -151,7 +146,6 @@ def dashboard():
                 logging.error(f"Error removing fan: {e}")
                 return jsonify({"success": False, "error": str(e)}), 500
 
-    # Update CO2 levels in fan_assignments before rendering
     room_data = fetch_room_data_cached()
     room_data.sort(key=lambda room: room['roomGroupName'])
 
@@ -170,4 +164,4 @@ def dashboard():
 if __name__ == '__main__':
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
-    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)
+    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5000)
