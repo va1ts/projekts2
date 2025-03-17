@@ -5,11 +5,13 @@ import logging
 DB_FILE = 'airaware.db'
 
 def get_db():
+    """Establish a connection to the database."""
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
 
 def load_runtime_log():
+    """Load the runtime log from the database."""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -43,6 +45,7 @@ def load_runtime_log():
         return {}
 
 def log_fan_action(room, action):
+    """Log a fan action (ON/OFF) in the database."""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -57,6 +60,7 @@ def log_fan_action(room, action):
         raise
 
 def calculate_runtime_today(fan):
+    """Calculate the total runtime of a fan for today."""
     runtime_log = load_runtime_log()
     if fan['room'] not in runtime_log:
         return 0
@@ -84,6 +88,7 @@ def calculate_runtime_today(fan):
     return round(total_runtime, 1)
 
 def calculate_total_runtime():
+    """Calculate the total runtime of all fans."""
     runtime_log = load_runtime_log()
     total_hours = 0
     
@@ -100,6 +105,7 @@ def calculate_total_runtime():
     return round(total_hours, 1)
 
 def get_last_active(fan):
+    """Get the last active time of a fan."""
     runtime_log = load_runtime_log()
     if fan['room'] not in runtime_log:
         return 'Never'
@@ -121,6 +127,7 @@ def get_last_active(fan):
     return f"{delta.seconds // 60}m ago"
 
 def calculate_efficiency(room_data, fan_data):
+    """Calculate the efficiency of fan usage."""
     if not fan_data:
         return 0
     
@@ -134,6 +141,7 @@ def calculate_efficiency(room_data, fan_data):
     return round(min(efficiency, 100), 1)
 
 def calculate_co2_reduction(current_co2, fan):
+    """Calculate the CO2 reduction achieved by a fan."""
     if fan['status'] == 'ON':
         target_co2 = 800  # Target CO2 level in ppm
         reduction = max(0, current_co2 - target_co2)
