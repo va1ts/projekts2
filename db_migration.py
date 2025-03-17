@@ -21,7 +21,6 @@ def migrate_database():
 
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS fan_assignments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             room TEXT NOT NULL,
             status TEXT NOT NULL,
             pin INTEGER NOT NULL

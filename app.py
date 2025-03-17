@@ -1,7 +1,8 @@
 import logging
 import threading
 import os
-from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify, g
+import sqlite3
 from api_handler import fetch_room_data_cached
 from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
@@ -15,7 +16,7 @@ from analytics_handler import (
     calculate_efficiency,
     calculate_co2_reduction
 )
-
+logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -24,7 +25,7 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
 
-DB_FILE = 'airaware.db'
+DB_FILE = os.path.abspath('airaware.db')
 if not os.path.exists(DB_FILE):
     from airaware import init_database
     init_database()
@@ -34,9 +35,22 @@ if not os.access(DB_FILE, os.W_OK):
     raise PermissionError(f"Database file {DB_FILE} is not writable!")
 
 fan_assignments = load_fan_assignments()
+logging.debug(f"Loaded fan assignments: {fan_assignments}")
 used_pins = {fan["pin"] for fan in fan_assignments}
 automation_in_progress = {}
 fan_lock = threading.Lock()
+
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(DB_FILE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+@app.teardown_appcontext
+def close_db(error):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
 @app.route('/')
 def home():
@@ -98,6 +112,7 @@ def dashboard():
 
     global fan_assignments
     fan_assignments = load_fan_assignments()
+    logging.debug(f"Dashboard: Loaded fan assignments: {fan_assignments}")  # Debugging log
 
     if request.method == 'POST':
         room_name = request.form.get('room')
@@ -111,12 +126,24 @@ def dashboard():
             
             try:
                 used_pins.add(available_pin)
-                initialize_fan(available_pin)
+                # Initialize fan with OFF state explicitly
+                initialize_fan(available_pin, initial_state=False)
                 new_fan = {'room': room_name, 'status': 'OFF', 'pin': available_pin}
                 fan_assignments.append(new_fan)
+                logging.debug(f"Dashboard: Added new fan: {new_fan}") 
                 save_fan_assignments(fan_assignments)
-                return jsonify({'success': True, 'message': f"Fan assigned to {room_name}.", 'fan': new_fan})
+                
+                # Verify fan is OFF after assignment
+                turn_fan_off(available_pin)
+                
+                return jsonify({
+                    'success': True, 
+                    'message': f"Fan assigned to {room_name}.", 
+                    'fan': new_fan
+                })
             except Exception as e:
+                used_pins.discard(available_pin)  # Remove pin if assignment failed
+                logging.error(f"Error assigning fan: {e}")
                 return jsonify({'success': False, 'error': str(e)})
 
         elif 'fan_control' in request.form:
@@ -150,8 +177,12 @@ def dashboard():
                         if fan_to_remove['status'] == 'ON':
                             turn_fan_off(fan_to_remove["pin"])
                         fan_assignments.remove(fan_to_remove)
+                        logging.debug(f"Dashboard: Removed fan: {fan_to_remove}")
                         used_pins.discard(fan_to_remove["pin"])
                         save_fan_assignments(fan_assignments)
+                        # Reload fan assignments from the database
+                        fan_assignments = load_fan_assignments()
+                        logging.debug(f"Dashboard: Reloaded fan assignments: {fan_assignments}")
                         flash(f"Fan removed from {room_name}.", "success")
                         return jsonify({"success": True, "message": f"Fan removed from {room_name}"})
                     return jsonify({"success": False, "error": "Fan not found"})
@@ -236,4 +267,4 @@ def get_fan_analytics():
 if __name__ == '__main__':
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
-    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5000)
+    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)

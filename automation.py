@@ -13,59 +13,38 @@ def automation_worker(fan_assignments, fan_lock):
         try:
             current_assignments = load_fan_assignments()
             room_data = fetch_room_data_cached()
-            co2_lookup = {room["roomGroupName"]: room.get("co2", 0) for room in room_data}
             
+            # Create CO2 lookup dictionary
+            co2_lookup = {
+                room['roomGroupName']: room.get('co2', 0) 
+                for room in room_data
+            }
             
-            with fan_lock:
-                for room in list(automation_in_progress.keys()):
-                    if not any(fan['room'] == room for fan in current_assignments):
-                        del automation_in_progress[room]
-                        logging.info(f"Automation stopped for removed fan in room {room}")
-            
-            assigned_rooms = {fan['room'] for fan in current_assignments}
-
-            
-            removed_rooms = set(automation_in_progress.keys()) - assigned_rooms
-            for room in removed_rooms:
-                for fan in fan_assignments:
-                    if fan['room'] == room:
-                        with fan_lock:
-                            turn_fan_off(fan["pin"])
-                            fan['status'] = 'OFF'
-                            save_fan_assignments(current_assignments)
-                            logging.info(f"Fan for room {room} was removed, shutting down pin {fan['pin']}")
-                del automation_in_progress[room]
-
-            fan_assignments.clear()
-            fan_assignments.extend(current_assignments)
-
             for fan in current_assignments:
                 room = fan['room']
                 current_co2 = co2_lookup.get(room, 0)
-
-                if room in manual_control and manual_control[room]:
-                    continue  
                 
-                if not automation_in_progress.get(room, False):
-                    if current_co2 >= 1000:
-                        logging.info(f"Turning ON fan in {room} due to high CO₂: {current_co2} ppm")
-                        automation_in_progress[room] = True
-                        with fan_lock:
-                            if any(f['room'] == room for f in load_fan_assignments()):
-                                turn_fan_on(fan["pin"])
-                                fan['status'] = 'ON'
-                                save_fan_assignments(current_assignments)
-                else:
-                    if current_co2 < 1000:
-                        logging.info(f"Turning OFF fan in {room}, CO₂ is now {current_co2} ppm")
-                        automation_in_progress[room] = False
-                        with fan_lock:
-                            if any(f['room'] == room for f in load_fan_assignments()):
-                                turn_fan_off(fan["pin"])
-                                fan['status'] = 'OFF'
-                                save_fan_assignments(current_assignments)
-
-            time.sleep(10)
+                # Skip if under manual control
+                if room in manual_control and manual_control[room]:
+                    continue
+                
+                # Only act if CO2 crosses thresholds
+                if current_co2 >= 1000 and not automation_in_progress.get(room, False):
+                    logging.info(f"CO2 high in {room}: {current_co2} ppm - Starting fan")
+                    automation_in_progress[room] = True
+                    with fan_lock:
+                        turn_fan_on(fan["pin"])
+                        fan['status'] = 'ON'
+                        save_fan_assignments(current_assignments)
+                elif current_co2 < 1000 and automation_in_progress.get(room, False):
+                    logging.info(f"CO2 normal in {room}: {current_co2} ppm - Stopping fan")
+                    automation_in_progress[room] = False
+                    with fan_lock:
+                        turn_fan_off(fan["pin"])
+                        fan['status'] = 'OFF'
+                        save_fan_assignments(current_assignments)
+                
+            time.sleep(10)  # Check every 10 seconds
         except Exception as e:
             logging.error(f"Error in automation worker: {e}")
-            time.sleep(10)
+            time.sleep(10)  # Wait before retrying
