@@ -2,7 +2,7 @@ import logging
 import sqlite3
 import os
 
-AVAILABLE_FAN_PINS = [18, 17, 23, 24, 25]
+AVAILABLE_FAN_PINS = [23, 24, 25]
 DB_FILE = os.path.abspath('airaware.db') 
 
 def get_db():
@@ -53,5 +53,3 @@ def save_fan_assignments(fan_assignments):
         conn.commit()
     except sqlite3.Error as e:
         logging.error(f"Error saving fan assignments: {e}")
-    finally:
-        conn.close()  # Ensure the connection is always closed

@@ -8,14 +8,7 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from automation import automation_worker, manual_control
-from analytics_handler import (
-    log_fan_action,
-    calculate_total_runtime,
-    calculate_runtime_today,
-    get_last_active,
-    calculate_efficiency,
-    calculate_co2_reduction
-)
+
 logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
@@ -24,8 +17,7 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
-
-DB_FILE = os.path.abspath('airaware.db')
+DB_FILE = os.path.abspath('airaware.db') 
 if not os.path.exists(DB_FILE):
     from airaware import init_database
     init_database()
@@ -39,12 +31,6 @@ logging.debug(f"Loaded fan assignments: {fan_assignments}")
 used_pins = {fan["pin"] for fan in fan_assignments}
 automation_in_progress = {}
 fan_lock = threading.Lock()
-
-def get_db():
-    if 'db' not in g:
-        g.db = sqlite3.connect(DB_FILE)
-        g.db.row_factory = sqlite3.Row
-    return g.db
 
 @app.teardown_appcontext
 def close_db(error):
@@ -112,7 +98,6 @@ def dashboard():
 
     global fan_assignments
     fan_assignments = load_fan_assignments()
-    logging.debug(f"Dashboard: Loaded fan assignments: {fan_assignments}")  # Debugging log
 
     if request.method == 'POST':
         room_name = request.form.get('room')
@@ -127,14 +112,11 @@ def dashboard():
             try:
                 used_pins.add(available_pin)
                 # Initialize fan with OFF state explicitly
-                initialize_fan(available_pin, initial_state=False)
+                initialize_fan(available_pin) # Initialize the fan
+                turn_fan_off(available_pin) # Set the fan to off explicitly
                 new_fan = {'room': room_name, 'status': 'OFF', 'pin': available_pin}
                 fan_assignments.append(new_fan)
-                logging.debug(f"Dashboard: Added new fan: {new_fan}") 
                 save_fan_assignments(fan_assignments)
-                
-                # Verify fan is OFF after assignment
-                turn_fan_off(available_pin)
                 
                 return jsonify({
                     'success': True, 
@@ -142,8 +124,6 @@ def dashboard():
                     'fan': new_fan
                 })
             except Exception as e:
-                used_pins.discard(available_pin)  # Remove pin if assignment failed
-                logging.error(f"Error assigning fan: {e}")
                 return jsonify({'success': False, 'error': str(e)})
 
         elif 'fan_control' in request.form:
@@ -156,12 +136,12 @@ def dashboard():
                                 turn_fan_on(fan["pin"])
                                 fan['status'] = 'ON'
                                 manual_control[room_name] = True
-                                log_fan_action(room_name, 'ON')
+                                logging.info(f"Manual control set to True for {room_name}") # Added logging
                             elif action == 'off':
                                 turn_fan_off(fan["pin"])
                                 fan['status'] = 'OFF'
                                 manual_control.pop(room_name, None)
-                                log_fan_action(room_name, 'OFF')
+                                logging.info(f"Manual control set to False for {room_name}") # Added logging
                             save_fan_assignments(fan_assignments)
                             return jsonify({"success": True, "status": fan['status']})
                     return jsonify({"success": False, "error": "Fan not found"})
@@ -177,12 +157,8 @@ def dashboard():
                         if fan_to_remove['status'] == 'ON':
                             turn_fan_off(fan_to_remove["pin"])
                         fan_assignments.remove(fan_to_remove)
-                        logging.debug(f"Dashboard: Removed fan: {fan_to_remove}")
                         used_pins.discard(fan_to_remove["pin"])
                         save_fan_assignments(fan_assignments)
-                        # Reload fan assignments from the database
-                        fan_assignments = load_fan_assignments()
-                        logging.debug(f"Dashboard: Reloaded fan assignments: {fan_assignments}")
                         flash(f"Fan removed from {room_name}.", "success")
                         return jsonify({"success": True, "message": f"Fan removed from {room_name}"})
                     return jsonify({"success": False, "error": "Fan not found"})
@@ -205,66 +181,8 @@ def dashboard():
 
     return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data=room_data)
 
-@app.route('/analytics')
-def analytics():
-    if 'user' not in session:
-        flash("Please log in to access analytics.", "warning")
-        return redirect(url_for('auth.login'))
-    
-    fan_data = load_fan_assignments()
-    room_data = fetch_room_data_cached()
-    active_fans = sum(1 for fan in fan_data if fan['status'] == 'ON')
-
-    analytics_data = {
-        'totalRuntime': calculate_total_runtime(),
-        'activeFans': f"{active_fans}/{len(fan_data)}",
-        'efficiency': calculate_efficiency(room_data, fan_data),
-        'fans': []
-    }
-
-    for fan in fan_data:
-        room_co2 = next((room['co2'] for room in room_data if room['roomGroupName'] == fan['room']), 0)
-        fan_info = {
-            'room': fan['room'],
-            'status': fan['status'],
-            'runtimeToday': calculate_runtime_today(fan),
-            'lastActive': get_last_active(fan),
-            'co2Reduced': calculate_co2_reduction(room_co2, fan)
-        }
-        analytics_data['fans'].append(fan_info)
-    
-    return render_template('analytics.html', analytics=analytics_data)
-
-@app.route('/api/analytics')
-def get_fan_analytics():
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    fan_data = load_fan_assignments()
-    room_data = fetch_room_data_cached()
-    active_fans = sum(1 for fan in fan_data if fan['status'] == 'ON')
-
-    analytics_data = {
-        'totalRuntime': calculate_total_runtime(),
-        'activeFans': f"{active_fans}/{len(fan_data)}",
-        'efficiency': calculate_efficiency(room_data, fan_data),
-        'fans': []
-    }
-
-    for fan in fan_data:
-        room_co2 = next((room['co2'] for room in room_data if room['roomGroupName'] == fan['room']), 0)
-        fan_info = {
-            'room': fan['room'],
-            'status': fan['status'],
-            'runtimeToday': calculate_runtime_today(fan),
-            'lastActive': get_last_active(fan),
-            'co2Reduced': calculate_co2_reduction(room_co2, fan)
-        }
-        analytics_data['fans'].append(fan_info)
-    
-    return jsonify(analytics_data)
-
 if __name__ == '__main__':
+    fan_lock = threading.Lock()
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
     app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)
