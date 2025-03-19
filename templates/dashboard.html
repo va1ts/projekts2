@@ -20,6 +20,13 @@
            alt="Dashboard Icon" 
            class="dashboard-logo">
     </div>
+
+    {# Display Notification #}
+    {% if notification %}
+        <div class="notification {{ notification.type }}">
+            {{ notification.message }}
+        </div>
+    {% endif %}
     
     <h4 style="color: #333; margin-bottom: 1.5rem;">Assign Fan to Room</h4>
     <form method="POST" class="assign-fan-form" id="assignFanForm" onsubmit="handleAssignFan(event)">

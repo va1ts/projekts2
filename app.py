@@ -32,6 +32,12 @@ used_pins = {fan["pin"] for fan in fan_assignments}
 automation_in_progress = {}
 fan_lock = threading.Lock()
 
+# CO2 Thresholds and Messages
+CO2_HIGH_THRESHOLD = 1500
+CO2_VERY_HIGH_THRESHOLD = 2000
+CO2_HIGH_MESSAGE = "CO2 levels are high ({:.0f} ppm).  Ventilation is recommended."
+CO2_VERY_HIGH_MESSAGE = "CO2 levels are VERY HIGH ({:.0f} ppm)! Immediate ventilation is strongly advised."
+
 @app.teardown_appcontext
 def close_db(error):
     db = g.pop('db', None)
@@ -141,6 +147,22 @@ def dashboard():
                                 turn_fan_off(fan["pin"])
                                 fan['status'] = 'OFF'
                                 manual_control.pop(room_name, None)
+
+                                # Check CO2 level and set session notification
+                                room_data = fetch_room_data_cached()
+                                room_co2 = next((room.get('co2', 0) for room in room_data if room['roomGroupName'] == room_name), 0)
+                                if room_co2 >= CO2_VERY_HIGH_THRESHOLD:
+                                    session['notification'] = {
+                                        'type': 'warning',
+                                        'message': CO2_VERY_HIGH_MESSAGE.format(room_co2),
+                                        'room': room_name
+                                    }
+                                elif room_co2 >= CO2_HIGH_THRESHOLD:
+                                    session['notification'] = {
+                                        'type': 'info',
+                                        'message': CO2_HIGH_MESSAGE.format(room_co2),
+                                        'room': room_name
+                                    }
                                 logging.info(f"Manual control set to False for {room_name}") # Added logging
                             save_fan_assignments(fan_assignments)
                             return jsonify({"success": True, "status": fan['status']})
@@ -179,7 +201,10 @@ def dashboard():
             if room["roomGroupName"] == fan['room']:
                 fan['co2_level'] = room.get("co2", 0)
 
-    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data=room_data)
+    # Check for notification in session
+    notification = session.pop('notification', None)
+
+    return render_template('dashboard.html', rooms=available_rooms, fan_assignments=fan_assignments, room_data=room_data, notification=notification)
 
 if __name__ == '__main__':
     fan_lock = threading.Lock()

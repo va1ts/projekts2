@@ -11,7 +11,7 @@ fan_states = {}
 def initialize_fan(pin):
     if pin not in fan_devices:
         try:
-            fan_devices[pin] = OutputDevice(pin, active_high=True)  # Changed to True
+            fan_devices[pin] = OutputDevice(pin, active_high=False)  # Changed to True
             logging.info(f"Fan at GPIO {pin} initialized successfully.")
         except GPIOZeroError as e:
             logging.error(f"Failed to initialize fan at GPIO {pin}: {e}")

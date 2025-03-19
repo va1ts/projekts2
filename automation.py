@@ -11,6 +11,7 @@ def automation_worker(fan_assignments, fan_lock):
     """Background thread to automate fan control based on CO₂ levels."""
     while True:
         try:
+            # Reload fan assignments and room data on each iteration
             current_assignments = load_fan_assignments()
             room_data = fetch_room_data_cached()
             
@@ -29,20 +30,30 @@ def automation_worker(fan_assignments, fan_lock):
                     continue
                 
                 # Only act if CO2 crosses thresholds
-                if current_co2 >= 1000 and not automation_in_progress.get(room, False):
-                    logging.info(f"CO2 high in {room}: {current_co2} ppm - Starting fan")
-                    automation_in_progress[room] = True
-                    with fan_lock:
-                        turn_fan_on(fan["pin"])
-                        fan['status'] = 'ON'
-                        save_fan_assignments(current_assignments)
-                elif current_co2 < 1000 and automation_in_progress.get(room, False):
-                    logging.info(f"CO2 normal in {room}: {current_co2} ppm - Stopping fan")
-                    automation_in_progress[room] = False
-                    with fan_lock:
-                        turn_fan_off(fan["pin"])
-                        fan['status'] = 'OFF'
-                        save_fan_assignments(current_assignments)
+                if current_co2 >= 1000:
+                    if not automation_in_progress.get(room, False):
+                        logging.info(f"CO2 high in {room}: {current_co2} ppm - Starting fan in {room}")
+                        automation_in_progress[room] = True
+                        with fan_lock:
+                            turn_fan_on(fan["pin"])
+                            # Update fan status directly in current_assignments
+                            for f in current_assignments:
+                                if f['room'] == room:
+                                    f['status'] = 'ON'
+                                    break  # Exit loop after updating the fan
+                            save_fan_assignments(current_assignments)
+                else:
+                    if automation_in_progress.get(room, False):
+                        logging.info(f"CO2 normal in {room}: {current_co2} ppm - Stopping fan in {room}")
+                        automation_in_progress[room] = False
+                        with fan_lock:
+                            turn_fan_off(fan["pin"])
+                            # Update fan status directly in current_assignments
+                            for f in current_assignments:
+                                if f['room'] == room:
+                                    f['status'] = 'OFF'
+                                    break  # Exit loop after updating the fan
+                            save_fan_assignments(current_assignments)
                 
             time.sleep(10)  # Check every 10 seconds
         except Exception as e:

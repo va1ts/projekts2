@@ -330,4 +330,19 @@
     object-fit: contain;
     display: block;
     margin: 0 auto 2rem auto;
-}
+  }
+  .notification {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    color: white;
+    text-align: center;
+  }
+
+  .notification.info {
+    background-color: #2196F3;
+  }
+
+  .notification.warning {
+    background-color: #ff9800;
+  }
