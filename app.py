@@ -8,30 +8,15 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from automation import automation_worker, manual_control
-from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Update paths to work on both PC and Raspberry Pi
-BASE_DIR = os.getenv('RASPBERRY_PI_PATH', os.path.dirname(os.path.abspath(__file__)))
-DB_FILE = os.path.join(BASE_DIR, 'airaware.db')
-
-app = Flask(__name__,
-    static_folder=os.path.join(BASE_DIR, 'static'),
-    static_url_path='/static'
-)
-
-# Use secure secret key from environment
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
+app = Flask(__name__, static_folder='static', static_url_path='/static')
+app.secret_key = 'your_secret_key'
 app.register_blueprint(auth)
-
-# Update the database path to work with PythonAnywhere
+DB_FILE = os.path.abspath('airaware.db') 
 if not os.path.exists(DB_FILE):
     from airaware import init_database
     init_database()
@@ -221,9 +206,4 @@ if __name__ == '__main__':
     fan_lock = threading.Lock()
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
-    
-    # Use environment variables for server configuration
-    debug = os.environ.get('FLASK_DEBUG', 'False') == 'True'
-    host = os.environ.get('FLASK_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_PORT', 5002))
-    app.run(debug=debug, use_reloader=False, host=host, port=port)
+    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)
