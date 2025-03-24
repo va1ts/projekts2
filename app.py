@@ -8,16 +8,30 @@ from hardware import turn_fan_on, turn_fan_off, initialize_fan
 from auth import auth
 from fan_handler import load_fan_assignments, save_fan_assignments, AVAILABLE_FAN_PINS
 from automation import automation_worker, manual_control
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(level=logging.WARNING)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
-app = Flask(__name__, static_folder='static', static_url_path='/static')
-app.secret_key = 'your_secret_key'
+# Load environment variables from .env file
+load_dotenv()
+
+# Update paths to work on both PC and Raspberry Pi
+BASE_DIR = os.getenv('RASPBERRY_PI_PATH', os.path.dirname(os.path.abspath(__file__)))
+DB_FILE = os.path.join(BASE_DIR, 'airaware.db')
+
+app = Flask(__name__,
+    static_folder=os.path.join(BASE_DIR, 'static'),
+    static_url_path='/static'
+)
+
+# Use secure secret key from environment
+app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
 app.register_blueprint(auth)
-DB_FILE = os.path.abspath('airaware.db') 
+
+# Update the database path to work with PythonAnywhere
 if not os.path.exists(DB_FILE):
     from airaware import init_database
     init_database()
@@ -27,7 +41,6 @@ if not os.access(DB_FILE, os.W_OK):
     raise PermissionError(f"Database file {DB_FILE} is not writable!")
 
 fan_assignments = load_fan_assignments()
-logging.debug(f"Loaded fan assignments: {fan_assignments}")
 used_pins = {fan["pin"] for fan in fan_assignments}
 automation_in_progress = {}
 fan_lock = threading.Lock()
@@ -142,7 +155,6 @@ def dashboard():
                                 turn_fan_on(fan["pin"])
                                 fan['status'] = 'ON'
                                 manual_control[room_name] = True
-                                logging.info(f"Manual control set to True for {room_name}") # Added logging
                             elif action == 'off':
                                 turn_fan_off(fan["pin"])
                                 fan['status'] = 'OFF'
@@ -163,7 +175,6 @@ def dashboard():
                                         'message': CO2_HIGH_MESSAGE.format(room_co2),
                                         'room': room_name
                                     }
-                                logging.info(f"Manual control set to False for {room_name}") # Added logging
                             save_fan_assignments(fan_assignments)
                             return jsonify({"success": True, "status": fan['status']})
                     return jsonify({"success": False, "error": "Fan not found"})
@@ -210,4 +221,9 @@ if __name__ == '__main__':
     fan_lock = threading.Lock()
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
-    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)
+    
+    # Use environment variables for server configuration
+    debug = os.environ.get('FLASK_DEBUG', 'False') == 'True'
+    host = os.environ.get('FLASK_HOST', '127.0.0.1')
+    port = int(os.environ.get('FLASK_PORT', 5002))
+    app.run(debug=debug, use_reloader=False, host=host, port=port)
