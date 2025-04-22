@@ -206,4 +206,4 @@ if __name__ == '__main__':
     fan_lock = threading.Lock()
     automation_thread = threading.Thread(target=automation_worker, args=(fan_assignments, fan_lock), daemon=True)
     automation_thread.start()
-    app.run(debug=False, use_reloader=False, host='0.0.0.0', port=5002)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

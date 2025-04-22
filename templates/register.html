@@ -2,10 +2,57 @@
 
 {% block title %}Register{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+.shake {
+  animation: shake 0.5s;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+.form-feedback {
+  transition: all 0.3s ease;
+  opacity: 0;
+  height: 0;
+}
+
+.form-feedback.show {
+  opacity: 1;
+  height: auto;
+  margin-top: 1rem;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #666;
+}
+</style>
+{% endblock %}
+
 {% block body %}
   <div class="d-flex justify-content-center align-items-center min-vh-100">
     <div class="card p-4 shadow-lg glass-card" style="width: 500px;">
       <h1 class="text-center mb-4 text-primary">Create an Account</h1>
+
+      {# Display Notification #}
+      {% if notification %}
+          <div class="notification {{ notification.type }}">
+              {{ notification.message }}
+          </div>
+      {% endif %}
   
       <form method="post" class="animate__animated animate__fadeIn">
         <div class="form-group">
@@ -15,29 +62,127 @@
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" class="form-control" id="password" name="password" required>
+          <div class="password-field">
+              <input type="password" class="form-control" id="password" name="password" required>
+              <i class="password-toggle fas fa-eye-slash" onclick="togglePassword('password', this)"></i>
+          </div>
           <small id="passwordHelp" class="form-text text-muted">Must be at least 8 characters and include an uppercase letter, lowercase letter, number, and special character.</small>
-            
-          </small>
-          <div id="passwordStrength" class="mt-2"></div>
         </div>
-        <button type="submit" class="btn btn-primary w-100">Register</button>
+
+        <div class="form-group">
+          <label for="confirm_password">Confirm Password</label>
+          <div class="password-field">
+              <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+              <i class="password-toggle fas fa-eye-slash" onclick="togglePassword('confirm_password', this)"></i>
+          </div>
+          <small class="form-text text-muted">Please re-enter your password.</small>
+        </div>
+            
+        <div id="passwordStrength" class="mt-2"></div>
+        <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+          <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+          <span class="btn-text">Register</span>
+        </button>
       </form>
 
   <!-- Password Strength Script -->
   <script>
     const passwordInput = document.getElementById('password');
     const strengthDisplay = document.getElementById('passwordStrength');
+    const confirmPassword = document.getElementById('confirm_password');
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    const btnText = submitBtn.querySelector('.btn-text');
 
-    passwordInput.addEventListener('input', () => {
-      const password = passwordInput.value;
-      const strongPassword = new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$');
+    function resetButton() {
+        spinner.classList.add('d-none');
+        btnText.textContent = 'Register';
+        submitBtn.disabled = false;
+    }
 
-      if (strongPassword.test(password)) {
-        strengthDisplay.innerHTML = '<div class=\"alert alert-success\">Strong password ✔️</div>';
-      } else {
-        strengthDisplay.innerHTML = '<div class=\"alert alert-danger\">Weak password ❌</div>';
-      }
+    function showError(message) {
+        strengthDisplay.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+        resetButton();
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        // Reset previous error messages
+        strengthDisplay.innerHTML = '';
+        
+        // Show loading state
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Registering...';
+        submitBtn.disabled = true;
+
+        // Check password strength
+        const result = checkPasswordStrength(passwordInput.value);
+        
+        if (!result.isStrong) {
+            showError('Password is not strong enough. Please ensure all requirements are met.');
+            return;
+        }
+
+        if (passwordInput.value !== confirmPassword.value) {
+            showError('Passwords do not match!');
+            return;
+        }
+
+        // If all validations pass, submit the form
+        form.submit();
     });
+
+    // Enhanced password strength check
+    function checkPasswordStrength(password) {
+        const checks = {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            number: /\d/.test(password),
+            special: /[@$!%*?&]/.test(password)
+        };
+
+        const strengthText = Object.entries(checks)
+            .filter(([, passed]) => !passed)
+            .map(([requirement]) => `Missing ${requirement}`);
+
+        return {
+            isStrong: Object.values(checks).every(v => v),
+            feedback: strengthText
+        };
+    }
+
+    // Real-time password strength feedback
+    passwordInput.addEventListener('input', () => {
+        const result = checkPasswordStrength(passwordInput.value);
+        
+        if (result.isStrong) {
+            strengthDisplay.innerHTML = '<div class="alert alert-success">Strong password ✔️</div>';
+        } else {
+            strengthDisplay.innerHTML = `
+                <div class="alert alert-warning">
+                    Password requirements:
+                    <ul>
+                        ${result.feedback.map(f => `<li>${f}</li>`).join('')}
+                    </ul>
+                </div>`;
+        }
+    });
+
+    // Add this to your existing script section
+    function togglePassword(inputId, icon) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        }
+    }
   </script>
 {% endblock %}

@@ -61,25 +61,47 @@ users = load_users()
 
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
-    """Handle user registration."""
     if request.method == 'POST':
-        username = request.form['username'].lower()
-        password = request.form['password']
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
 
-        if username in users:
-            flash("Username already exists.", "warning")
-            return redirect(url_for('auth.register'))
-        
-        if not is_strong_password(password):
-            flash("Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.", "warning")
-            return redirect(url_for('auth.register'))
-        
-        password_hash = generate_password_hash(password, method='sha256')
-        save_user(username, password_hash)
-        users[username] = {'password': password_hash, 'role': 'user'}
+        # Server-side validation
+        errors = []
+        if len(password) < 8:
+            errors.append('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in password):
+            errors.append('Password must include an uppercase letter')
+        if not any(c.islower() for c in password):
+            errors.append('Password must include a lowercase letter')
+        if not any(c.isdigit() for c in password):
+            errors.append('Password must include a number')
+        if not any(c in '@$!%*?&' for c in password):
+            errors.append('Password must include a special character')
+        if password != confirm_password:
+            errors.append('Passwords do not match')
 
-        flash("Registration successful.", "success")
-        return redirect(url_for('auth.login'))
+        if errors:
+            for error in errors:
+                flash(error, 'error')
+            return render_template('register.html'), 400
+
+        try:
+            # Your existing registration logic here
+            if username in users:
+                flash("Username already exists.", "warning")
+                return redirect(url_for('auth.register'))
+            
+            password_hash = generate_password_hash(password, method='sha256')
+            save_user(username, password_hash)
+            users[username] = {'password': password_hash, 'role': 'user'}
+
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('auth.login'))
+            
+        except Exception as e:
+            flash(f'Registration failed: {str(e)}', 'error')
+            return render_template('register.html'), 400
 
     return render_template('register.html')
 
